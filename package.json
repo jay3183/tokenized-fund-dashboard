@@ -1,0 +1,31 @@
+{
+  "name": "graphql-intraday-yield",
+  "version": "1.0.0",
+  "description": "GraphQL API for tracking tokenized fund data, including NAV and intraday yield information",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js",
+    "test": "jest",
+    "test-queries": "node test-queries.js"
+  },
+  "keywords": [
+    "graphql",
+    "finance",
+    "yield",
+    "nav",
+    "tokenized",
+    "fund"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "apollo-server": "^3.12.0",
+    "graphql": "^16.7.1",
+    "graphql-request": "^6.1.0"
+  },
+  "devDependencies": {
+    "jest": "^29.6.1",
+    "nodemon": "^3.0.1"
+  }
+}

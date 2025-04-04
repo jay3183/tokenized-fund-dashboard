@@ -1,0 +1,84 @@
+scalar JSON
+
+type User {
+  id: ID!
+  name: String!
+  holdings: [Holding!]!
+}
+
+type Holding {
+  fundId: ID!
+  units: Float!
+  fund: Fund
+}
+
+type Fund {
+  id: ID!
+  name: String!
+  chainId: String!
+  assetType: String!
+  currentNav: Float!
+  intradayYield: Float!
+  yieldHistory: [YieldHistory!]!
+  inceptionDate: String
+  auditLogs: [AuditLog!] 
+  currentNAV: NAVSnapshot
+  portfolios: [Portfolio!] 
+}
+
+type YieldHistory {
+  timestamp: String!
+  yield: Float!
+}
+
+type NAVSnapshot {
+  id: ID!
+  fundId: ID!
+  nav: Float!
+  timestamp: String!
+  source: String!
+}
+
+type Portfolio {
+  id: ID!
+  investorId: ID!
+  fundId: ID!
+  shares: Float!
+}
+
+type AuditLog {
+  id: ID!
+  actor: String!
+  action: String!
+  target: String
+  timestamp: String!
+  metadata: JSON
+}
+
+type MintResult {
+  sharesMinted: Float!
+  navUsed: Float!
+  timestamp: String!
+}
+
+type RedeemResult {
+  sharesRedeemed: Float!
+  navUsed: Float!
+  amountUSD: Float!
+  timestamp: String!
+}
+
+type Query {
+  user(id: ID!): User
+  fund(id: ID!): Fund
+  allFunds: [Fund!]
+  navHistory(fundId: ID!): [NAVSnapshot!]!
+  portfolio(investorId: ID!, fundId: ID!): Portfolio
+  auditLogs(fundId: ID!): [AuditLog!]!
+}
+
+type Mutation {
+  updateNAV(fundId: ID!, nav: Float!): NAVSnapshot!
+  mintShares(fundId: ID!, investorId: ID!, amountUSD: Float!): MintResult!
+  redeemShares(fundId: ID!, investorId: ID!, shares: Float!): RedeemResult!
+}
