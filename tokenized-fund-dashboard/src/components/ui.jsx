@@ -29,4 +29,45 @@ export const Button = ({ children, variant = 'primary', className = '', ...props
       {children}
     </button>
   );
-}; 
+};
+
+export const Tooltip = ({ children, message }) => {
+  const [show, setShow] = React.useState(false);
+  
+  return (
+    <div className="relative inline-block">
+      <div 
+        onMouseEnter={() => setShow(true)}
+        onMouseLeave={() => setShow(false)}
+        className="inline-flex"
+      >
+        {children}
+      </div>
+      {show && (
+        <div className="absolute z-50 w-48 px-2 py-1 text-xs text-white bg-gray-800 rounded-md shadow-lg -top-1 left-full ml-2">
+          {message}
+          <div className="absolute w-2 h-2 bg-gray-800 -left-1 top-1/2 transform -translate-y-1/2 rotate-45"></div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export const InfoIcon = () => (
+  <svg 
+    xmlns="http://www.w3.org/2000/svg" 
+    width="16" 
+    height="16" 
+    viewBox="0 0 24 24" 
+    fill="none" 
+    stroke="currentColor" 
+    strokeWidth="2" 
+    strokeLinecap="round" 
+    strokeLinejoin="round" 
+    className="inline-block text-gray-400 cursor-help ml-1"
+  >
+    <circle cx="12" cy="12" r="10" />
+    <path d="M12 16v-4" />
+    <path d="M12 8h.01" />
+  </svg>
+); 

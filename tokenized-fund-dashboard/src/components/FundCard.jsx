@@ -47,11 +47,14 @@ export default function FundCard({ fund, onClick, isSelected }) {
             <span className="font-medium text-gray-900 dark:text-gray-100">
               {formatUSD(fund.currentNAV?.nav || fund.currentNav)}
             </span>
-            <DeltaBadge 
-              value={(fund.navHistory && fund.navHistory.length > 1) 
-                ? (fund.currentNAV?.nav || fund.currentNav) - fund.navHistory[fund.navHistory.length - 2].nav 
-                : 0} 
-            />
+            <span className="transition duration-300 ease-in-out">
+              <DeltaBadge 
+                delta={(fund.navHistory && fund.navHistory.length > 1) 
+                  ? ((fund.currentNAV?.nav || fund.currentNav) - fund.navHistory[fund.navHistory.length - 2].nav) / 
+                    fund.navHistory[fund.navHistory.length - 2].nav * 100
+                  : 0.01} 
+              />
+            </span>
           </div>
         </div>
 

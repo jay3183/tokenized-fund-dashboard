@@ -8,7 +8,7 @@ import {
   useMutation
 } from '@apollo/client';
 import toast, { Toaster } from 'react-hot-toast';
-import { Card, CardContent, Button } from './components/ui';
+import { Card, CardContent, Button, Tooltip, InfoIcon } from './components/ui';
 import NavChart from './components/NavChart';
 import YieldChart from './components/YieldChart';
 import DualChart from './components/DualChart';
@@ -350,11 +350,22 @@ function FundList() {
                     separator=","
                   />
                 </span>
-                <DeltaBadge nav={fund.currentNAV?.nav} fundId={fund.id} />
+                <span className="transition duration-300 ease-in-out">
+                  <DeltaBadge 
+                    delta={prevNav && prevNav !== 0 
+                      ? ((fund.currentNAV?.nav - prevNav) / prevNav) * 100 
+                      : 0.01}
+                  />
+                </span>
               </p>
               
               <p className="text-sm text-muted-foreground">
-                Total AUM:{' '}
+                <span className="flex items-center">
+                  <Tooltip message="Total Assets Under Management (AUM) in USD.">
+                    <InfoIcon />
+                  </Tooltip>
+                  <span className="ml-1">Total AUM:{' '}</span>
+                </span>
                 <span className="font-semibold text-black dark:text-white">
                   {formatAUM(fund.totalAum)}
                 </span>
@@ -544,7 +555,7 @@ function AuditLog({ fundId }) {
         <p className="text-sm text-gray-500 dark:text-gray-400">No audit logs available</p>
       ) : (
         <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
-          {filteredLogs.map((log) => (
+          {role === 'ADMIN' && filteredLogs.map((log) => (
             <div key={log.id} className="border-b border-gray-100 dark:border-gray-700 pb-2 last:border-0">
               <div className="flex justify-between text-xs">
                 <span className="text-gray-500 dark:text-gray-400">{formatTime(log.timestamp)}</span>

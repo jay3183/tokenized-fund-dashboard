@@ -36,7 +36,8 @@ const resolvers = {
   },
 
   Mutation: {
-    mintShares: (_, { fundId, investorId, amountUSD }) => {
+    mintShares: (_, { input }) => {
+      const { fundId, investorId, amountUsd } = input;
       const fund = funds.find(f => f.id === fundId);
       const user = users.find(u => u.id === investorId);
 
@@ -45,7 +46,7 @@ const resolvers = {
       }
 
       const nav = fund.currentNav ?? 100; // fallback for safety
-      const shares = amountUSD / nav;
+      const shares = amountUsd / nav;
 
       const holding = user.holdings.find(h => h.fundId === fundId);
       if (holding) {
@@ -61,7 +62,8 @@ const resolvers = {
       };
     },
     
-    redeemShares: (_, { fundId, investorId, shares }) => {
+    redeemShares: (_, { input }) => {
+      const { fundId, investorId, shares } = input;
       const fund = funds.find(f => f.id === fundId);
       const user = users.find(u => u.id === investorId);
       if (!fund || !user) throw new Error('Invalid fund or user');
@@ -72,7 +74,7 @@ const resolvers = {
       }
 
       const nav = fund.currentNAV?.nav || 0;
-      const amountUSD = parseFloat((shares * nav).toFixed(2));
+      const amountUsd = parseFloat((shares * nav).toFixed(2));
       holding.units -= shares;
 
       const logEntry = {
@@ -84,7 +86,7 @@ const resolvers = {
         metadata: {
           sharesRedeemed: shares,
           navUsed: nav,
-          amountUSD,
+          amountUsd,
         },
       };
       auditLogs.push(logEntry);
@@ -92,7 +94,7 @@ const resolvers = {
       return {
         sharesRedeemed: shares,
         navUsed: nav,
-        amountUSD,
+        amountUsd,
         timestamp: logEntry.timestamp,
       };
     },

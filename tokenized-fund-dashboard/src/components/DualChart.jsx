@@ -5,6 +5,7 @@ import {
 } from 'recharts';
 import { gql, useQuery } from '@apollo/client';
 import { timeAgo } from '../utils/timeAgo';
+import { format } from 'date-fns';
 
 // GraphQL query to get both NAV and yield history for a fund
 const FUND_QUERY = gql`
@@ -31,22 +32,26 @@ const formatTime = (timestamp) => {
   try {
     if (!timestamp) return 'Unknown';
     
-    // Check if timestamp is already formatted as a time string
-    if (typeof timestamp === 'string' && timestamp.includes(':')) {
-      return timestamp;
+    // Handle case where multiple ISO strings might be concatenated
+    let cleanTimestamp = timestamp;
+    
+    // Check if we have a string with multiple timestamps
+    if (typeof timestamp === 'string') {
+      // If we have a situation like "2025-04-04T18:33:14.324Z2025-04-04T22:08:14.324Z"
+      if (timestamp.includes('Z') && timestamp.indexOf('Z') < timestamp.length - 1) {
+        // Extract just the first timestamp
+        cleanTimestamp = timestamp.substring(0, timestamp.indexOf('Z') + 1);
+      }
     }
     
-    // Otherwise parse as date and format
-    const date = new Date(timestamp);
+    // Parse as date and format
+    const date = new Date(cleanTimestamp);
     if (isNaN(date.getTime())) {
-      console.warn('Invalid timestamp:', timestamp);
+      console.warn('Invalid timestamp:', cleanTimestamp, 'from original:', timestamp);
       return 'Invalid time';
     }
     
-    return date.toLocaleTimeString([], { 
-      hour: '2-digit', 
-      minute: '2-digit'
-    });
+    return format(date, 'MMM d, h:mm a');
   } catch (error) {
     console.error('Error formatting timestamp:', timestamp, error);
     return 'Invalid time';
@@ -78,8 +83,27 @@ function DualChartContent({ fundId, stableJitterPattern }) {
   const [chartData, setChartData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [lastUpdated, setLastUpdated] = useState('');
-  const [timeAgoText, setTimeAgoText] = useState('');
+  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [latestTimestamp, setLatestTimestamp] = useState(new Date().toISOString());
+
+  // Check for dark mode
+  useEffect(() => {
+    const checkDarkMode = () => {
+      setIsDarkMode(document.documentElement.classList.contains('dark'));
+    };
+    
+    // Check on mount
+    checkDarkMode();
+    
+    // Set up mutation observer to watch for class changes on html element
+    const observer = new MutationObserver(checkDarkMode);
+    observer.observe(document.documentElement, { 
+      attributes: true, 
+      attributeFilter: ['class'] 
+    });
+    
+    return () => observer.disconnect();
+  }, []);
 
   // Apollo query for fund data
   const { data, error: queryError, loading: queryLoading } = useQuery(
@@ -91,28 +115,13 @@ function DualChartContent({ fundId, stableJitterPattern }) {
     }
   );
 
-  // Update the lastUpdated timestamp whenever new data arrives
+  // Update the latestTimestamp whenever new data arrives
   useEffect(() => {
     if (data?.fund) {
       const now = new Date().toISOString();
-      setLastUpdated(now);
-      setTimeAgoText(timeAgo(now));
+      setLatestTimestamp(now);
     }
   }, [data]);
-
-  // Update the "time ago" text every 15 seconds
-  useEffect(() => {
-    if (!lastUpdated) return;
-    
-    const updateTimeAgoText = () => {
-      setTimeAgoText(timeAgo(lastUpdated));
-    };
-    
-    const intervalId = setInterval(updateTimeAgoText, 15000);
-    
-    // Clean up interval on unmount
-    return () => clearInterval(intervalId);
-  }, [lastUpdated]);
 
   // Process fund data when it changes
   useEffect(() => {
@@ -546,6 +555,29 @@ function DualChartContent({ fundId, stableJitterPattern }) {
     });
   }, [chartData, stableJitterPattern]);
 
+  // Create and memoize series data for the chart
+  const seriesData = useMemo(() => {
+    if (!chartData || chartData.length === 0) return {};
+    
+    // Get min/max values for scaling
+    const navValues = chartData.map(d => d.nav).filter(v => v !== undefined && v !== null);
+    const yieldValues = chartData.map(d => d.yield).filter(v => v !== undefined && v !== null);
+    
+    const navMin = Math.min(...navValues) * 0.998;
+    const navMax = Math.max(...navValues) * 1.002;
+    const yieldMin = Math.min(...yieldValues) * 0.98;
+    const yieldMax = Math.max(...yieldValues) * 1.02;
+    
+    // Color definitions
+    const navColor = isDarkMode ? '#3B82F6' : '#2563EB';
+    const yieldColor = '#10B981';
+    
+    return {
+      navMin, navMax, yieldMin, yieldMax,
+      navColor, yieldColor
+    };
+  }, [chartData, isDarkMode]);
+
   // Conditional rendering for loading state
   if (loading) {
     return <LoadingState />;
@@ -561,9 +593,6 @@ function DualChartContent({ fundId, stableJitterPattern }) {
     return <EmptyState />;
   }
 
-  // Check if we're in dark mode
-  const isDarkMode = document.documentElement.classList.contains('dark');
-  
   // Color constants for chart elements
   const navColor = isDarkMode ? '#3B82F6' : '#2563EB';
   const yieldColor = '#22c55e';
@@ -583,11 +612,7 @@ function DualChartContent({ fundId, stableJitterPattern }) {
              viewMode === 'NAV' ? 'NAV History' : 
              'NAV & Yield History'}
           </h2>
-          {timeAgoText && (
-            <span className="text-xs text-gray-500 dark:text-gray-400">
-              Updated: {timeAgoText}
-            </span>
-          )}
+          <p className="text-xs text-gray-500 dark:text-gray-400">Last updated: {timeAgo(latestTimestamp)}</p>
         </div>
         <div className="flex flex-wrap gap-2">
           {/* View mode selector */}
@@ -698,7 +723,11 @@ function DualChartContent({ fundId, stableJitterPattern }) {
               dataKey="timestamp"
               tick={{ fill: isDarkMode ? "#9CA3AF" : "#6B7280", fontSize: 12 }}
               stroke={isDarkMode ? "#4B5563" : "#D1D5DB"}
-              tickFormatter={formatTime}
+              tickFormatter={(value) => {
+                // Add debug logging to see what value is coming in
+                console.log("XAxis value:", value);
+                return formatTime(value);
+              }}
               interval="preserveStart"
               minTickGap={15}
               tickMargin={12}
@@ -745,31 +774,84 @@ function DualChartContent({ fundId, stableJitterPattern }) {
             )}
             
             <Tooltip 
-              formatter={(value, name) => {
-                if (name === 'NAV') {
-                  if (value === undefined || value === null || isNaN(value)) {
-                    return ['$0.00', 'NAV'];
+              content={({ active, payload, label }) => {
+                if (active && payload && payload.length) {
+                  // Get timestamp directly from the label or payload
+                  let timestamp = label;
+                  
+                  // Debug the raw timestamp to see what we're receiving
+                  console.log("Raw tooltip timestamp:", timestamp);
+                  
+                  // Try to extract timestamp from payload if label doesn't work
+                  if (!timestamp && payload[0] && payload[0].payload) {
+                    timestamp = payload[0].payload.timestamp;
+                    console.log("Using payload timestamp:", timestamp);
                   }
-                  return [`$${parseFloat(value).toFixed(2)}`, 'NAV'];
-                }
-                if (name === 'Yield') {
-                  if (value === undefined || value === null || isNaN(value)) {
-                    return ['0.00%', 'Yield'];
+                  
+                  // Handle case where multiple ISO strings are concatenated
+                  let cleanTimestamp = timestamp;
+                  if (typeof timestamp === 'string') {
+                    // Check if we have multiple ISO strings concatenated
+                    if (timestamp.includes('Z') && timestamp.indexOf('Z') < timestamp.length - 1) {
+                      // Extract just the first complete ISO string
+                      cleanTimestamp = timestamp.substring(0, timestamp.indexOf('Z') + 1);
+                      console.log("Extracted first ISO timestamp:", cleanTimestamp);
+                    }
                   }
-                  return [`${parseFloat(value).toFixed(2)}%`, 'Yield'];
+                  
+                  // Format the timestamp
+                  let formattedDate;
+                  try {
+                    const date = new Date(cleanTimestamp);
+                    console.log("Parsing date:", date);
+                    formattedDate = format(date, 'MMM d, h:mm a');
+                    console.log("Formatted date:", formattedDate);
+                  } catch (e) {
+                    console.error("Error formatting date:", e, "with input:", cleanTimestamp);
+                    formattedDate = "Invalid date";
+                  }
+                  
+                  return (
+                    <div className="custom-tooltip p-2 shadow-md rounded" 
+                      style={{ 
+                        backgroundColor: isDarkMode ? '#1F2937' : 'white',
+                        border: isDarkMode ? 'none' : '1px solid #E5E7EB',
+                        color: isDarkMode ? '#E5E7EB' : '#111827',
+                        borderRadius: '8px'
+                      }}
+                    >
+                      <p className="font-medium text-xs text-gray-500">
+                        {formattedDate}
+                      </p>
+                      {payload.map((entry, index) => {
+                        let value, name;
+                        if (entry.name === 'NAV') {
+                          value = entry.value === undefined || entry.value === null || isNaN(entry.value)
+                            ? '$0.00'
+                            : `$${parseFloat(entry.value).toFixed(2)}`;
+                          name = 'NAV';
+                        } else if (entry.name === 'Yield') {
+                          value = entry.value === undefined || entry.value === null || isNaN(entry.value)
+                            ? '0.00%'
+                            : `${parseFloat(entry.value).toFixed(2)}%`;
+                          name = 'Yield';
+                        } else {
+                          value = entry.value;
+                          name = entry.name;
+                        }
+                        
+                        return (
+                          <p key={index} className="text-sm mt-1">
+                            <span style={{ color: entry.color }}>{name}: </span>
+                            <span className="font-medium">{value}</span>
+                          </p>
+                        );
+                      })}
+                    </div>
+                  );
                 }
-                return [value, name];
+                return null;
               }}
-              contentStyle={{ 
-                backgroundColor: isDarkMode ? '#1F2937' : 'white',
-                borderRadius: 8, 
-                border: isDarkMode ? 'none' : '1px solid #E5E7EB',
-                color: isDarkMode ? '#E5E7EB' : '#111827'
-              }}
-              labelStyle={{ 
-                color: isDarkMode ? '#9CA3AF' : '#6B7280' 
-              }}
-              labelFormatter={formatTime}
             />
             
             {/* Add or modify the Legend component to be conditional */}

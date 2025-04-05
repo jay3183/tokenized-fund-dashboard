@@ -3,40 +3,11 @@
  * @param {string|Date} timestamp - ISO string or Date object
  * @returns {string} Formatted relative time
  */
-export function timeAgo(timestamp) {
-  const now = new Date();
-  const date = typeof timestamp === 'string' ? new Date(timestamp) : timestamp;
-  
-  // Ensure valid date
-  if (isNaN(date.getTime())) {
-    return 'Invalid date';
-  }
-
-  const seconds = Math.floor((now - date) / 1000);
-  
-  // Less than a minute
-  if (seconds < 60) {
-    return `${seconds}s ago`;
-  }
-  
-  // Less than an hour
+export function timeAgo(dateStr) {
+  const seconds = Math.floor((Date.now() - new Date(dateStr)) / 1000);
+  if (seconds < 60) return `${seconds}s ago`;
   const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) {
-    return `${minutes}m ago`;
-  }
-  
-  // Less than a day
+  if (minutes < 60) return `${minutes}m ago`;
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) {
-    return `${hours}h ago`;
-  }
-  
-  // Less than a week
-  const days = Math.floor(hours / 24);
-  if (days < 7) {
-    return `${days}d ago`;
-  }
-  
-  // Format as date for older timestamps
-  return date.toLocaleDateString();
+  return `${hours}h ago`;
 } 

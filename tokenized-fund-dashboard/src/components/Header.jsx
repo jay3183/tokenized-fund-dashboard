@@ -30,7 +30,7 @@ export default function Header({ onToggleTheme }) {
         <div className="h-8 w-10 bg-white rounded-sm flex items-center justify-center text-[#003057] font-bold text-xs">FT</div>
         <h1 className="text-2xl font-bold text-white">Franklin Templeton Fund Dashboard</h1>
       </div>
-      <div className="flex items-center space-x-3">
+      <div className="flex flex-wrap justify-center gap-3 mt-3">
         <span className="text-sm hidden sm:inline">Logged in as:</span>
         <select
           value={role}
