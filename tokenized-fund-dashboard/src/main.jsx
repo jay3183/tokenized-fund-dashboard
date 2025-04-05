@@ -5,13 +5,67 @@ import './index.css'; // tailwind styles
 import { ApolloClient, InMemoryCache, ApolloProvider } from '@apollo/client';
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import PrintableReport from './pages/PrintableReport.jsx';
+import { RoleProvider } from './RoleContext.jsx';
 
 // Create the Apollo Client with custom merge functions for cache
 const client = new ApolloClient({
-  uri: 'http://localhost:4000',
+  uri: 'http://localhost:4000/',
+  credentials: 'include', // Enable credentials
   cache: new InMemoryCache({
     typePolicies: {
+      Query: {
+        fields: {
+          auditLogs: {
+            merge(existing = [], incoming) {
+              return incoming;
+            },
+          },
+          yieldHistory: {
+            merge(existing = [], incoming) {
+              return incoming;
+            },
+          },
+          navHistory: {
+            merge(existing = [], incoming) {
+              return incoming;
+            },
+          },
+        },
+      },
+      AuditLog: {
+        keyFields: ['id'],
+      },
+      NAVSnapshot: {
+        keyFields: ['fundId', 'timestamp'], // ✅ Using fundId + timestamp as unique combo key
+        fields: {
+          fundId: {
+            read(fundId, { readField }) {
+              // If fundId exists, return it
+              if (fundId) return fundId;
+              
+              // Try to get fundId from the parent Fund if available
+              const fund = readField('fund');
+              if (fund) {
+                const fundId = readField('id', fund);
+                if (fundId) return fundId;
+              }
+              
+              // As a last resort, if we have an id that follows the pattern "F1-nav-timestamp"
+              // extract the fund ID from it
+              const id = readField('id');
+              if (id && typeof id === 'string' && id.includes('-nav-')) {
+                const parts = id.split('-nav-');
+                if (parts.length > 0) return parts[0];
+              }
+              
+              // Return a default value if all else fails (avoids cache errors)
+              return "F1";
+            }
+          }
+        }
+      },
       Fund: {
+        keyFields: ['id'], // Ensure Fund is cacheable
         fields: {
           // Add merge policy for the currentNAV field
           currentNAV: {
@@ -20,20 +74,36 @@ const client = new ApolloClient({
           },
           navHistory: {
             // Always merge new data with existing data
-            merge: true,
+            merge(existing = [], incoming) {
+              return incoming;
+            },
           },
           yieldHistory: {
             // Always merge new data with existing data
-            merge: true,
+            merge(existing = [], incoming) {
+              return incoming;
+            },
           }
         }
       },
-      NAVSnapshot: {
-        // Use timestamp as the key field for NAVSnapshot objects
-        keyFields: ["timestamp"],
-      }
-    }
+      User: {
+        keyFields: ['id'],
+      },
+      Portfolio: {
+        keyFields: ['investorId', 'fundId'],
+      },
+    },
   }),
+  defaultOptions: {
+    watchQuery: {
+      fetchPolicy: 'network-only',
+      errorPolicy: 'all',
+    },
+    query: {
+      fetchPolicy: 'network-only',
+      errorPolicy: 'all',
+    },
+  }
 });
 
 // Set up routes
@@ -51,7 +121,9 @@ const router = createBrowserRouter([
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <ApolloProvider client={client}>
-      <RouterProvider router={router} />
+      <RoleProvider>
+        <RouterProvider router={router} />
+      </RoleProvider>
     </ApolloProvider>
   </React.StrictMode>
 );

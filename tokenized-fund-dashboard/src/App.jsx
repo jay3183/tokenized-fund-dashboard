@@ -1,4 +1,4 @@
-import { useState, useEffect, createContext, useContext } from 'react';
+import { useState, useEffect } from 'react';
 import {
   ApolloClient,
   InMemoryCache,
@@ -15,16 +15,20 @@ import DualChart from './components/DualChart';
 import DeltaBadge from './components/DeltaBadge';
 import YieldBadge from './components/YieldBadge';
 import AccruedYield from './components/AccruedYield';
+import PortfolioPanel from './components/PortfolioPanel';
 import Header from './components/Header';
 import { formatUSD, formatAUM } from './utils/formatCurrency';
 import CountUp from 'react-countup';
 import { format, parseISO } from 'date-fns';
 import { timeAgo } from './utils/timeAgo';
+import { useRole } from './RoleContext';
 
 // Helper function for formatting timestamps consistently
 function formatTime(timestamp) {
   const date = new Date(timestamp);
-  return date.toLocaleTimeString([], { 
+  return date.toLocaleString([], { 
+    month: 'short',
+    day: 'numeric',
     hour: '2-digit', 
     minute: '2-digit', 
     hour12: true 
@@ -35,9 +39,6 @@ const client = new ApolloClient({
   uri: import.meta.env.VITE_GRAPHQL_API,
   cache: new InMemoryCache(),
 });
-
-const RoleContext = createContext();
-export const useRole = () => useContext(RoleContext);
 
 const FUNDS_QUERY = gql`
   query GetAllFunds {
@@ -161,6 +162,7 @@ const getToastOptions = (role) => {
 function FundActions({ fund, role, mintShares, redeemShares, data }) {
   const [showMintTooltip, setShowMintTooltip] = useState(false);
   const [showRedeemTooltip, setShowRedeemTooltip] = useState(false);
+  const [showWithdrawTooltip, setShowWithdrawTooltip] = useState(false);
   
   const handleMint = async () => {
     try {
@@ -181,13 +183,13 @@ function FundActions({ fund, role, mintShares, redeemShares, data }) {
           }
         },
       });
-      console.log('✅ Mint response:', res);
+      console.log('Mint response:', res);
       toast.success(
         `Successfully minted ${res.data.mintShares.sharesMinted.toFixed(2)} shares at $${res.data.mintShares.navUsed.toFixed(2)} per share.`,
         getToastOptions(role)
       );
     } catch (err) {
-      console.error('❌ Mint failed:', err);
+      console.error('Mint failed:', err);
       toast.error(`Mint failed: ${err.message}`, getToastOptions(role));
     }
   };
@@ -208,11 +210,49 @@ function FundActions({ fund, role, mintShares, redeemShares, data }) {
           }
         },
       });
-      console.log('✅ Redeem response:', res);
+      console.log('Redeem response:', res);
       toast.success(`Redeemed ${redeemedShares} shares!`, getToastOptions(role));
     } catch (err) {
-      console.error('❌ Redeem failed:', err);
+      console.error('Redeem failed:', err);
       toast.error(`Redeem failed: ${err.message}`, getToastOptions(role));
+    }
+  };
+
+  const handleWithdrawYield = async () => {
+    try {
+      const response = await fetch('http://localhost:4000/graphql', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query: `
+            mutation WithdrawYield($investorId: ID!, $fundId: ID!) {
+              withdrawYield(investorId: $investorId, fundId: $fundId) {
+                amount
+                timestamp
+              }
+            }
+          `,
+          variables: {
+            investorId: '1',
+            fundId: fund.id
+          }
+        })
+      });
+
+      const result = await response.json();
+      console.log('Yield withdrawn:', result);
+      
+      if (result.data && result.data.withdrawYield) {
+        const { amount, timestamp } = result.data.withdrawYield;
+        toast.success(`Successfully withdrawn $${amount.toFixed(2)} yield!`, 
+          getToastOptions(role)
+        );
+      } else if (result.errors) {
+        throw new Error(result.errors[0].message);
+      }
+    } catch (err) {
+      console.error('❌ Withdraw yield failed:', err);
+      toast.error(`Withdraw yield failed: ${err.message}`, getToastOptions(role));
     }
   };
 
@@ -262,6 +302,28 @@ function FundActions({ fund, role, mintShares, redeemShares, data }) {
           </div>
         )}
       </div>
+      
+      <div className="relative">
+        <Button 
+          variant="primary"
+          onClick={handleWithdrawYield}
+          className="w-full sm:w-auto bg-amber-500 hover:bg-amber-600 transition-colors duration-300 text-white"
+          onMouseEnter={() => setShowWithdrawTooltip(true)}
+          onMouseLeave={() => setShowWithdrawTooltip(false)}
+          onFocus={() => setShowWithdrawTooltip(true)}
+          onBlur={() => setShowWithdrawTooltip(false)}
+          aria-label="Withdraw accrued yield"
+          title="Withdraw accrued yield from the fund"
+        >
+          Withdraw Yield
+        </Button>
+        {showWithdrawTooltip && (
+          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 -translate-y-2 bg-gray-800 text-white text-sm px-3 py-1.5 rounded shadow-lg z-10 mb-1 whitespace-nowrap">
+            <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-1/2 rotate-45 w-2 h-2 bg-gray-800"></div>
+            <p>Withdraw accrued yield from your investment</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -271,6 +333,9 @@ function FundList() {
   const { loading, error, data, refetch } = useQuery(FUNDS_QUERY);
   const [mintShares] = useMutation(MINT_SHARES);
   const [redeemShares] = useMutation(REDEEM_SHARES);
+  const [accruedToday, setAccruedToday] = useState(164.77); // simulate accrued yield
+  
+  console.log('FundList - Current Role:', role);
   
   // Create state variables outside of the map function
   const [prevNavMap, setPrevNavMap] = useState({});
@@ -362,7 +427,9 @@ function FundList() {
               <p className="text-sm text-muted-foreground">
                 <span className="flex items-center">
                   <Tooltip message="Total Assets Under Management (AUM) in USD.">
-                    <InfoIcon />
+                    <div className="inline-flex">
+                      <InfoIcon />
+                    </div>
                   </Tooltip>
                   <span className="ml-1">Total AUM:{' '}</span>
                 </span>
@@ -413,14 +480,7 @@ function FundList() {
               
               {role === 'INVESTOR' && (
                 <>
-                  <PortfolioPanel fundId={fund.id} />
-                  <FundActions 
-                    fund={fund} 
-                    role={role} 
-                    mintShares={mintShares} 
-                    redeemShares={redeemShares} 
-                    data={data}
-                  />
+                  <PortfolioPanel fundId="F1" investorId="I1" />
                 </>
               )}
               {role === 'ADMIN' && (
@@ -442,69 +502,6 @@ function FundList() {
         );
       })}
     </div>
-  );
-}
-
-function PortfolioPanel({ fundId }) {
-  const { loading, error, data } = useQuery(PORTFOLIO_QUERY, {
-    variables: { fundId },
-    skip: !fundId,
-  });
-
-  // Calculate values for display
-  const yieldPercentage = data?.fund?.intradayYield || 0;
-  const accruedToday = data?.portfolio?.shares 
-    ? ((data.fund.intradayYield / 100) * data.fund.currentNAV.nav * data.portfolio.shares)
-    : 0;
-  
-  const formattedAccrued = new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-  }).format(accruedToday);
-
-  return (
-    <Card className="mb-4">
-      <h3 className="font-medium mb-2 text-gray-700 dark:text-gray-300">Your Portfolio</h3>
-      {loading ? (
-        <div className="space-y-2">
-          <Skeleton className="h-5 w-1/2" />
-          <Skeleton className="h-4 w-3/4" />
-        </div>
-      ) : error ? (
-        <p className="text-sm text-red-500 dark:text-red-400">Failed to load portfolio data</p>
-      ) : !data?.portfolio ? (
-        <p className="text-sm text-gray-500 dark:text-gray-400">No portfolio data found</p>
-      ) : (
-        <Card className="rounded-xl border border-gray-200 shadow-sm bg-white">
-          <CardContent className="flex flex-col sm:flex-row sm:items-center sm:justify-between px-5 py-4 gap-4">
-
-            {/* Shares held */}
-            <div className="flex items-center gap-2 text-green-700 font-medium text-sm sm:text-base whitespace-nowrap">
-              ✅ You hold <span className="font-semibold text-green-800">{data.portfolio.shares.toFixed(2)}</span> shares
-            </div>
-
-            {/* Stats */}
-            <div className="flex items-center divide-x divide-gray-200 text-sm sm:text-base text-right">
-              
-              <div className="px-4">
-                <p className="text-gray-500">Intraday Yield</p>
-                <p className="text-blue-600 font-semibold">
-                  <CountUp end={yieldPercentage} suffix="%" decimals={2} duration={0.75} />
-                </p>
-              </div>
-
-              <div className="px-4">
-                <p className="text-gray-500">Accrued Today</p>
-                <p className="text-green-700 font-semibold">
-                  {formattedAccrued}
-                </p>
-              </div>
-
-            </div>
-          </CardContent>
-        </Card>
-      )}
-    </Card>
   );
 }
 
@@ -541,11 +538,11 @@ function AuditLog({ fundId }) {
           {[1, 2, 3].map(i => (
             <div key={i} className="flex flex-col space-y-1">
               <div className="flex justify-between">
-                <Skeleton className="h-4 w-24" />
-                <Skeleton className="h-4 w-16" />
+                <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                <div className="h-4 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
               </div>
-              <Skeleton className="h-3 w-full" />
-              <Skeleton className="h-3 w-3/4" />
+              <div className="h-3 w-full bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+              <div className="h-3 w-3/4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
             </div>
           ))}
         </div>
@@ -555,7 +552,7 @@ function AuditLog({ fundId }) {
         <p className="text-sm text-gray-500 dark:text-gray-400">No audit logs available</p>
       ) : (
         <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
-          {role === 'ADMIN' && filteredLogs.map((log) => (
+          {filteredLogs.map((log) => (
             <div key={log.id} className="border-b border-gray-100 dark:border-gray-700 pb-2 last:border-0">
               <div className="flex justify-between text-xs">
                 <span className="text-gray-500 dark:text-gray-400">{formatTime(log.timestamp)}</span>
@@ -572,8 +569,6 @@ function AuditLog({ fundId }) {
 }
 
 export default function App() {
-  const [role, setRole] = useState('INVESTOR');
-
   useEffect(() => {
     // Add transition classes to body when component mounts
     document.body.classList.add('transition-colors', 'duration-300');
@@ -601,14 +596,14 @@ export default function App() {
   }, []);
 
   return (
-    <ApolloProvider client={client}>
-      <RoleContext.Provider value={{ role, setRole }}>
-        <Toaster position="bottom-right" />
-        <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-200 transition-colors duration-300">
-          <Header onToggleTheme={toggleDarkMode} />
+    <>
+      <Toaster position="bottom-right" />
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-200 transition-colors duration-300">
+        <Header onToggleTheme={toggleDarkMode} />
+        <div className="pt-24 px-4 max-w-7xl mx-auto">
           <FundList />
         </div>
-      </RoleContext.Provider>
-    </ApolloProvider>
+      </div>
+    </>
   );
 }

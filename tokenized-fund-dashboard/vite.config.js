@@ -25,12 +25,6 @@ export default defineConfig(({ mode }) => {
     },
     server: {
       port: 5173,
-      proxy: {
-        '/graphql': {
-          target: env.VITE_GRAPHQL_API,
-          changeOrigin: true,
-        },
-      },
     },
   }
 })

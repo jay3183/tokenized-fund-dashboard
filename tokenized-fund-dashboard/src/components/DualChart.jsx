@@ -51,7 +51,13 @@ const formatTime = (timestamp) => {
       return 'Invalid time';
     }
     
-    return format(date, 'MMM d, h:mm a');
+    // Log the ISO string and formatted time for debugging
+    console.log(`XAxis timestamp: ${format(date, 'MMM d, h:mm:ss a')}`);
+    console.log(`XAxis value: ${cleanTimestamp}`);
+    
+    // Display just the hour and minute in a simple format
+    // This makes the x-axis labels much more readable
+    return format(date, 'h:mm a');
   } catch (error) {
     console.error('Error formatting timestamp:', timestamp, error);
     return 'Invalid time';
@@ -161,6 +167,25 @@ function DualChartContent({ fundId, stableJitterPattern }) {
         
         console.log(`Data received - NAV: ${navPoints.length} points, Yield: ${yieldPoints.length} points`);
         
+        // Format the data points with readable time
+        const formattedYieldData = yieldPoints.map(item => ({
+          time: new Date(item.timestamp).toLocaleTimeString([], {
+            hour: '2-digit',
+            minute: '2-digit'
+          }),
+          yield: item.yield,
+          timestamp: item.timestamp
+        }));
+
+        const formattedNAVData = navPoints.map(item => ({
+          time: new Date(item.timestamp).toLocaleTimeString([], {
+            hour: '2-digit',
+            minute: '2-digit'
+          }),
+          nav: item.nav,
+          timestamp: item.timestamp
+        }));
+
         // Process data points and apply filters
         const processedData = processChartData(navPoints, yieldPoints, range);
         
@@ -721,17 +746,24 @@ function DualChartContent({ fundId, stableJitterPattern }) {
             
             <XAxis 
               dataKey="timestamp"
-              tick={{ fill: isDarkMode ? "#9CA3AF" : "#6B7280", fontSize: 12 }}
+              tick={{ 
+                fill: isDarkMode ? "#9CA3AF" : "#6B7280", 
+                fontSize: 12,
+                angle: -15, // Rotate text slightly for better readability
+                textAnchor: 'end',
+                dy: 8 // Adjust vertical position to prevent overlap
+              }}
               stroke={isDarkMode ? "#4B5563" : "#D1D5DB"}
               tickFormatter={(value) => {
                 // Add debug logging to see what value is coming in
                 console.log("XAxis value:", value);
                 return formatTime(value);
               }}
-              interval="preserveStart"
-              minTickGap={15}
-              tickMargin={12}
+              interval={Math.ceil(chartData.length / 6)} // Limit to about 6 ticks on the x-axis
+              minTickGap={40} // Increase gap between ticks
+              tickMargin={16} // Add more margin below the ticks
               padding={{ left: 10, right: 10 }}
+              height={60} // Give more space for the x-axis
             />
             
             {/* NAV y-axis on the left */}
@@ -804,7 +836,8 @@ function DualChartContent({ fundId, stableJitterPattern }) {
                   try {
                     const date = new Date(cleanTimestamp);
                     console.log("Parsing date:", date);
-                    formattedDate = format(date, 'MMM d, h:mm a');
+                    // More detailed date for the tooltip
+                    formattedDate = format(date, 'MMM d, yyyy • h:mm a');
                     console.log("Formatted date:", formattedDate);
                   } catch (e) {
                     console.error("Error formatting date:", e, "with input:", cleanTimestamp);

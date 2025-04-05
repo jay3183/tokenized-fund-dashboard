@@ -139,13 +139,17 @@ for (let i = 0; i <= 288; i++) {
   // Ensure yield stays positive and reasonable
   yieldPct = Math.max(0.8, Math.min(2.2, yieldPct));
   
-  NAV_DATA.push({ timestamp: timestamp.toISOString(), nav: parseFloat(nav.toFixed(2)) });
+  NAV_DATA.push({ 
+    timestamp: timestamp.toISOString(), 
+    nav: parseFloat(nav.toFixed(2)),
+    fundId: "F1"
+  });
   YIELD_DATA.push({ timestamp: timestamp.toISOString(), yield: parseFloat(yieldPct.toFixed(3)) });
 }
 
 const users = [
   {
-    id: "1",
+    id: "I1",
     name: "Jason",
     holdings: [
       {

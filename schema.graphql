@@ -68,7 +68,12 @@ type MintResult {
 type RedeemResult {
   sharesRedeemed: Float!
   navUsed: Float!
-  amountUsd: Float!
+  amountUSD: Float!
+  timestamp: String!
+}
+
+type YieldWithdrawalResult {
+  amount: Float!
   timestamp: String!
 }
 
@@ -86,6 +91,7 @@ type Mutation {
   updateNAV(input: UpdateNAVInput!): NAVSnapshot!
   mintShares(input: MintSharesInput!): MintResult!
   redeemShares(input: RedeemSharesInput!): RedeemResult!
+  withdrawYield(investorId: ID!, fundId: ID!): YieldWithdrawalResult!
 }
 
 input UpdateNAVInput {

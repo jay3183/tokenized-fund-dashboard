@@ -31,6 +31,15 @@ export const Button = ({ children, variant = 'primary', className = '', ...props
   );
 };
 
+export const Skeleton = ({ className = "", width }) => {
+  return (
+    <div 
+      className={`animate-pulse bg-gray-200 dark:bg-gray-700 rounded ${className}`}
+      style={width ? { width } : {}}
+    />
+  );
+};
+
 export const Tooltip = ({ children, message }) => {
   const [show, setShow] = React.useState(false);
   

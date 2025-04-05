@@ -22,6 +22,10 @@ const server = new ApolloServer({
   context: { users, funds, auditLogs },
   playground: true,
   introspection: true,
+  cors: {
+    origin: 'http://localhost:5173', // Specify the exact frontend origin
+    credentials: true
+  },
 });
 
 // Start the server
@@ -58,7 +62,7 @@ function updateFundNav(fund) {
   fund.navHistory.push({
     timestamp: new Date().toISOString(),
     nav: fund.currentNav,
-    source: "system"
+    fundId: fund.id
   });
   
   console.log(`Updated ${fund.name} NAV: ${previousNav} → ${fund.currentNav}`);
