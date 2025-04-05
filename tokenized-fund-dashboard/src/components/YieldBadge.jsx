@@ -1,7 +1,9 @@
 import React from 'react';
 
 export default function YieldBadge({ value, className = "" }) {
-  const isPositive = value >= 0;
+  // Handle null or undefined values
+  const safeValue = value == null ? 0 : value;
+  const isPositive = safeValue >= 0;
   
   return (
     <span 
@@ -12,7 +14,7 @@ export default function YieldBadge({ value, className = "" }) {
       `}
     >
       {isPositive ? '+' : ''}
-      {value.toFixed(3)}%
+      {safeValue.toFixed(3)}%
       {isPositive ? (
         <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 ml-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />

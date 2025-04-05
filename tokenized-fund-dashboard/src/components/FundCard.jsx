@@ -45,11 +45,11 @@ export default function FundCard({ fund, onClick, isSelected }) {
           <div className="text-sm text-gray-600 dark:text-gray-400">Current NAV</div>
           <div className="flex items-center gap-2">
             <span className="font-medium text-gray-900 dark:text-gray-100">
-              {formatUSD(fund.currentNav)}
+              {formatUSD(fund.currentNAV?.nav || fund.currentNav)}
             </span>
             <DeltaBadge 
               value={(fund.navHistory && fund.navHistory.length > 1) 
-                ? fund.currentNav - fund.navHistory[fund.navHistory.length - 2].nav 
+                ? (fund.currentNAV?.nav || fund.currentNav) - fund.navHistory[fund.navHistory.length - 2].nav 
                 : 0} 
             />
           </div>
@@ -66,7 +66,11 @@ export default function FundCard({ fund, onClick, isSelected }) {
         {/* Accrued Yield */}
         <div className="flex items-center justify-between">
           <div className="text-sm text-gray-600 dark:text-gray-400">Accrued Yield</div>
-          <AccruedYield value={fund.totalAum * (fund.intradayYield / 100 / 365)} />
+          <AccruedYield value={
+            (fund.totalAum != null && fund.intradayYield != null) 
+              ? fund.totalAum * (fund.intradayYield / 100 / 365) 
+              : 0
+          } />
         </div>
       </div>
 

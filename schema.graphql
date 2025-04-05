@@ -9,6 +9,7 @@ type User {
 type Holding {
   fundId: ID!
   units: Float!
+  shares: Float
   fund: Fund
 }
 
@@ -23,7 +24,10 @@ type Fund {
   inceptionDate: String
   auditLogs: [AuditLog!] 
   currentNAV: NAVSnapshot
-  portfolios: [Portfolio!] 
+  portfolios: [Portfolio!]
+  totalAum: Float
+  nav: Float
+  updatedAt: String
 }
 
 type YieldHistory {
@@ -64,7 +68,7 @@ type MintResult {
 type RedeemResult {
   sharesRedeemed: Float!
   navUsed: Float!
-  amountUSD: Float!
+  amountUsd: Float!
   timestamp: String!
 }
 
@@ -73,12 +77,31 @@ type Query {
   fund(id: ID!): Fund
   allFunds: [Fund!]
   navHistory(fundId: ID!): [NAVSnapshot!]!
+  yieldHistory(fundId: ID!): [YieldHistory!]!
   portfolio(investorId: ID!, fundId: ID!): Portfolio
   auditLogs(fundId: ID!): [AuditLog!]!
 }
 
 type Mutation {
-  updateNAV(fundId: ID!, nav: Float!): NAVSnapshot!
-  mintShares(fundId: ID!, investorId: ID!, amountUSD: Float!): MintResult!
-  redeemShares(fundId: ID!, investorId: ID!, shares: Float!): RedeemResult!
+  updateNAV(input: UpdateNAVInput!): NAVSnapshot!
+  mintShares(input: MintSharesInput!): MintResult!
+  redeemShares(input: RedeemSharesInput!): RedeemResult!
+}
+
+input UpdateNAVInput {
+  fundId: ID!
+  nav: Float!
+  source: String
+}
+
+input MintSharesInput {
+  fundId: ID!
+  investorId: ID!
+  amountUsd: Float!
+}
+
+input RedeemSharesInput {
+  fundId: ID!
+  investorId: ID!
+  shares: Float!
 }

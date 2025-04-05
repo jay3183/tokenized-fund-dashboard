@@ -150,7 +150,7 @@ const users = [
     holdings: [
       {
         fundId: "F1",
-        shares: 100,
+        units: 100,
       },
     ],
   },
@@ -164,10 +164,9 @@ const funds = [
     assetType: "mutual_fund",
     currentNav: NAV_DATA[NAV_DATA.length - 1].nav,
     intradayYield: YIELD_DATA[YIELD_DATA.length - 1].yield,
-    totalAum: 22400000,
+    totalAUM: 22400000,
     navHistory: NAV_DATA,
     yieldHistory: YIELD_DATA,
-    inceptionDate: "2023-01-15T00:00:00Z"
   },
 ];
 
@@ -194,15 +193,15 @@ const auditLogs = [
     action: "MINT",
     target: "F1",
     timestamp: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-    metadata: { sharesMinted: 50, amountUsd: 5000, navUsed: 100.00 }
+    metadata: { sharesMinted: 50, amountUSD: 5000, navUsed: 100.00 }
   },
   {
     id: "AL4",
     actor: "Jason",
     action: "REDEEM",
     target: "F1",
-    timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-    metadata: { sharesRedeemed: 20, amountUsd: 2050, navUsed: 102.50 }
+    timestamp: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
+    metadata: { sharesRedeemed: 10, amountUSD: 1050, navUsed: 105.00 }
   },
   {
     id: "AL5",
@@ -226,7 +225,7 @@ const auditLogs = [
     action: "MINT",
     target: "F1",
     timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-    metadata: { sharesMinted: 25, amountUsd: 2575, navUsed: 103.00 }
+    metadata: { sharesMinted: 25, amountUSD: 2575, navUsed: 103.00 }
   },
   {
     id: "AL8",
@@ -234,7 +233,7 @@ const auditLogs = [
     action: "REDEEM",
     target: "F1",
     timestamp: new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString(),
-    metadata: { sharesRedeemed: 40, amountUsd: 4120, navUsed: 103.00 }
+    metadata: { sharesRedeemed: 40, amountUSD: 4120, navUsed: 103.00 }
   },
   {
     id: "AL9",

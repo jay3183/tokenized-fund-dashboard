@@ -6,7 +6,9 @@ export default function AccruedYield({ value }) {
   
   // Simulate real-time accrual by incrementing slightly over time
   useEffect(() => {
-    const baseValue = value / 86400; // Per second (24h * 60m * 60s)
+    // Handle null or undefined values gracefully
+    const safeValue = value == null ? 0 : value;
+    const baseValue = safeValue / 86400; // Per second (24h * 60m * 60s)
     let lastUpdate = Date.now();
     
     const interval = setInterval(() => {

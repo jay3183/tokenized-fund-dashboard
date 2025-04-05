@@ -2,7 +2,6 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App.jsx';
 import './index.css'; // tailwind styles
-
 import { ApolloClient, InMemoryCache, ApolloProvider } from '@apollo/client';
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import PrintableReport from './pages/PrintableReport.jsx';
@@ -14,6 +13,11 @@ const client = new ApolloClient({
     typePolicies: {
       Fund: {
         fields: {
+          // Add merge policy for the currentNAV field
+          currentNAV: {
+            // Use the timestamp as a unique identifier
+            merge: true,
+          },
           navHistory: {
             // Always merge new data with existing data
             merge: true,
@@ -25,8 +29,8 @@ const client = new ApolloClient({
         }
       },
       NAVSnapshot: {
-        // Use id as the key field for NAVSnapshot objects
-        keyFields: ["id"],
+        // Use timestamp as the key field for NAVSnapshot objects
+        keyFields: ["timestamp"],
       }
     }
   }),

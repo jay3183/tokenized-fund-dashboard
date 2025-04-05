@@ -1,36 +1,42 @@
 /**
- * Formats a date as a relative time string (e.g., "5 minutes ago")
- * @param {string} dateString - ISO date string to format
- * @returns {string} Relative time string
+ * Formats a timestamp into a human-readable relative time (e.g., "30s ago")
+ * @param {string|Date} timestamp - ISO string or Date object
+ * @returns {string} Formatted relative time
  */
-export function timeAgo(dateString) {
-  const date = new Date(dateString);
+export function timeAgo(timestamp) {
   const now = new Date();
+  const date = typeof timestamp === 'string' ? new Date(timestamp) : timestamp;
+  
+  // Ensure valid date
+  if (isNaN(date.getTime())) {
+    return 'Invalid date';
+  }
+
   const seconds = Math.floor((now - date) / 1000);
   
-  // Handle future dates
-  if (seconds < 0) {
-    return 'in the future';
+  // Less than a minute
+  if (seconds < 60) {
+    return `${seconds}s ago`;
   }
   
-  // Time intervals in seconds
-  const intervals = {
-    year: 31536000,
-    month: 2592000,
-    week: 604800,
-    day: 86400,
-    hour: 3600,
-    minute: 60,
-    second: 1
-  };
-  
-  let counter;
-  for (const [unit, secondsInUnit] of Object.entries(intervals)) {
-    counter = Math.floor(seconds / secondsInUnit);
-    if (counter > 0) {
-      return `${counter} ${unit}${counter === 1 ? '' : 's'} ago`;
-    }
+  // Less than an hour
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) {
+    return `${minutes}m ago`;
   }
   
-  return 'just now';
+  // Less than a day
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) {
+    return `${hours}h ago`;
+  }
+  
+  // Less than a week
+  const days = Math.floor(hours / 24);
+  if (days < 7) {
+    return `${days}d ago`;
+  }
+  
+  // Format as date for older timestamps
+  return date.toLocaleDateString();
 } 

@@ -12,12 +12,12 @@ function PortfolioPanel({ fundId }) {
     skip: !fundId,
   });
 
-  // Calculate values for display
-  const yieldPercentage = data?.fund?.intradayYield || 0;
-  const nav = data?.fund?.currentNAV?.nav || 0;
-  const shares = data?.portfolio?.shares || 0;
+  // Calculate values for display with safe null checks
+  const yieldPercentage = data?.fund?.intradayYield ?? 0;
+  const nav = data?.fund?.currentNAV?.nav ?? 0;
+  const shares = data?.portfolio?.shares ?? 0;
   
-  // Fix calculation: yield percentage * NAV * shares
+  // Fix calculation: yield percentage * NAV * shares with null safety
   const accruedToday = (yieldPercentage / 100) * nav * shares;
   
   // Format as currency

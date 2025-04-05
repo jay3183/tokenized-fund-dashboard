@@ -19,118 +19,33 @@ body {
   background-color: #f8fafc;
 }
 
-/* Basic focus styles - less aggressive than before */
+/* Global focus styles - remove all focus indicators */
 *:focus {
-  outline: 2px solid rgba(0, 114, 206, 0.3);
+  outline: none !important;
+  box-shadow: none !important;
+  border-color: transparent !important;
 }
 
-/* Specifically target the theme toggle and select elements */
+/* Specifically target the theme toggle */
 [aria-label="Toggle Theme"],
 [aria-label="Toggle Theme"]:after,
 [aria-label="Toggle Theme"]:before,
 [aria-label="Toggle Theme"] *,
 [aria-label="Toggle Theme"] *:after,
-[aria-label="Toggle Theme"] *:before,
-select,
-select:focus,
-button,
-button:focus {
+[aria-label="Toggle Theme"] *:before {
   outline: none !important;
   box-shadow: none !important;
   border: none !important;
   text-decoration: none !important;
-  -webkit-tap-highlight-color: transparent !important;
-  -webkit-touch-callout: none !important;
 }
 
 /* Prevent any focus styles on the theme toggle */
 div[aria-label="Toggle Theme"],
 div[role="button"],
 div[role="button"]:focus,
-div[role="button"]:active,
-select,
-select:focus,
-select:active,
-button,
-button:focus,
-button:active {
+div[role="button"]:active {
   outline: none !important;
   box-shadow: none !important;
-  -webkit-tap-highlight-color: transparent !important;
-}
-
-/* Specifically target elements in fullscreen mode */
-:fullscreen button,
-:fullscreen select,
-:fullscreen div[role="button"],
-:-webkit-full-screen button,
-:-webkit-full-screen select,
-:-webkit-full-screen div[role="button"],
-:-moz-full-screen button,
-:-moz-full-screen select,
-:-moz-full-screen div[role="button"] {
-  outline: none !important;
-  box-shadow: none !important;
-  -webkit-tap-highlight-color: transparent !important;
-  -webkit-focus-ring-color: transparent !important;
-}
-
-/* Safari-specific fixes for blue focus dot in fullscreen mode */
-@media not all and (min-resolution:.001dpcm) {
-  @supports (-webkit-appearance:none) {
-    /* Safari-only CSS for fullscreen blue dot elimination */
-    button, [role="button"], div, span, select, a {
-      outline-color: transparent !important;
-      outline-width: 0 !important;
-      outline-style: none !important;
-      -webkit-tap-highlight-color: rgba(0,0,0,0) !important;
-      -webkit-focus-ring-color: transparent !important;
-      -webkit-highlight: none !important;
-      highlight: none !important;
-    }
-
-    /* Specific fix for Safari fullscreen blue dot */
-    :-webkit-full-screen button,
-    :-webkit-full-screen [role="button"],
-    :-webkit-full-screen div,
-    :-webkit-full-screen span,
-    :-webkit-full-screen a {
-      -webkit-tap-highlight-color: rgba(0,0,0,0) !important;
-      -webkit-focus-ring-color: transparent !important;
-    }
-
-    /* Safari fullscreen direct fix for the blue dot */
-    .text-blue-dot-fix {
-      box-shadow: none !important;
-      outline: none !important;
-      -webkit-tap-highlight-color: rgba(0,0,0,0) !important;
-      -webkit-focus-ring-color: transparent !important;
-    }
-  }
-}
-
-@media screen and (-webkit-min-device-pixel-ratio:0) {
-  select:focus, button:focus, [role="button"]:focus {
-    outline-width: 0 !important;
-    outline-style: none !important;
-    outline-color: transparent !important;
-    -webkit-focus-ring-color: transparent !important;
-    box-shadow: none !important;
-    border-color: transparent !important; 
-  }
-  
-  /* Reset header element borders so they display properly */
-  header select {
-    border: 1px solid rgba(255, 255, 255, 0.3) !important;
-  }
-  
-  /* Target webkit autofill styles in Safari */
-  input:-webkit-autofill,
-  select:-webkit-autofill,
-  textarea:-webkit-autofill {
-    -webkit-box-shadow: 0 0 0 1000px #003057 inset !important;
-    -webkit-text-fill-color: white !important;
-  }
 }
 
 /* Global transition effects for dark mode */

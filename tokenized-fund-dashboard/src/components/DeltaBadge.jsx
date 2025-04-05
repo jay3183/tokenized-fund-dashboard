@@ -1,37 +1,32 @@
-import React from 'react';
+import { useRef, useEffect, useState } from 'react';
 
-export default function DeltaBadge({ value, className = "" }) {
-  const isPositive = value > 0;
-  const isZero = value === 0;
-  
+export default function DeltaBadge({ nav, fundId }) {
+  // Default to 0, ensuring nav is a number
+  const safeNav = nav == null ? 0 : nav;
+  const prev = useRef(safeNav);
+  const [delta, setDelta] = useState(0);
+
+  useEffect(() => {
+    if (safeNav === 0 && prev.current === 0) {
+      setDelta(0);
+    } else {
+      setDelta(safeNav - prev.current);
+      prev.current = safeNav;
+    }
+  }, [safeNav]);
+
+  if (delta === 0) return null;
+
+  const isUp = delta > 0;
+  const color = isUp 
+    ? 'text-green-600 dark:text-green-400' 
+    : 'text-red-600 dark:text-red-400';
+  const sign = isUp ? '+' : '';
+  const arrow = isUp ? '▲' : '▼';
+
   return (
-    <span 
-      className={`
-        inline-flex items-center text-xs font-medium px-1.5 py-0.5 rounded
-        ${isPositive ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' : 
-         isZero ? 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300' : 
-                'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'}
-        ${className}
-      `}
-    >
-      {isPositive ? '+' : ''}
-      ${Math.abs(value).toFixed(2)}
-      {!isZero && (
-        <svg 
-          xmlns="http://www.w3.org/2000/svg" 
-          className="h-3 w-3 ml-0.5" 
-          fill="none" 
-          viewBox="0 0 24 24" 
-          stroke="currentColor"
-        >
-          <path 
-            strokeLinecap="round" 
-            strokeLinejoin="round" 
-            strokeWidth={2} 
-            d={isPositive ? "M5 15l7-7 7 7" : "M19 9l-7 7-7-7"} 
-          />
-        </svg>
-      )}
+    <span className={`text-sm font-medium ${color} ml-2 transition-colors duration-300 flex items-center`}>
+      {arrow} {sign}{Math.abs(delta).toFixed(2)}
     </span>
   );
 } 

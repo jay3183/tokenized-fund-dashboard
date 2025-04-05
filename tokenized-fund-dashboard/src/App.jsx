@@ -9,14 +9,16 @@ import {
 } from '@apollo/client';
 import toast, { Toaster } from 'react-hot-toast';
 import { Card, CardContent, Button } from './components/ui';
+import NavChart from './components/NavChart';
+import YieldChart from './components/YieldChart';
 import DualChart from './components/DualChart';
 import DeltaBadge from './components/DeltaBadge';
 import YieldBadge from './components/YieldBadge';
 import AccruedYield from './components/AccruedYield';
 import Header from './components/Header';
-import FundCard from './components/FundCard';
 import { formatUSD, formatAUM } from './utils/formatCurrency';
 import CountUp from 'react-countup';
+import { format, parseISO } from 'date-fns';
 import { timeAgo } from './utils/timeAgo';
 
 // Helper function for formatting timestamps consistently
@@ -30,7 +32,7 @@ function formatTime(timestamp) {
 }
 
 const client = new ApolloClient({
-  uri: 'http://localhost:4000',
+  uri: import.meta.env.VITE_GRAPHQL_API,
   cache: new InMemoryCache(),
 });
 
@@ -47,48 +49,21 @@ const FUNDS_QUERY = gql`
       inceptionDate
       intradayYield
       totalAum
-      currentNav
-      navHistory {
-        id
-        timestamp
-        nav
-        source
-      }
       yieldHistory {
         timestamp
         yield
       }
-    }
-  }
-`;
-
-const FUND_DETAIL_QUERY = gql`
-  query GetFundDetail($id: ID!) {
-    fund(id: $id) {
-      id
-      name
-      chainId
-      assetType
-      inceptionDate
-      intradayYield
-      totalAum
-      currentNav
-      navHistory {
-        id
-        timestamp
+      currentNAV {
         nav
-        source
-      }
-      yieldHistory {
         timestamp
-        yield
+        source
       }
     }
   }
 `;
 
 const MINT_SHARES = gql`
-  mutation MintShares($input: MintSharesInput!) {
+  mutation Mint($input: MintSharesInput!) {
     mintShares(input: $input) {
       sharesMinted
       navUsed
@@ -98,7 +73,7 @@ const MINT_SHARES = gql`
 `;
 
 const REDEEM_SHARES = gql`
-  mutation RedeemShares($input: RedeemSharesInput!) {
+  mutation Redeem($input: RedeemSharesInput!) {
     redeemShares(input: $input) {
       sharesRedeemed
       navUsed
@@ -115,25 +90,23 @@ const AUDIT_LOGS_QUERY = gql`
       timestamp
       actor
       action
-      target
       metadata
     }
   }
 `;
 
 export const PORTFOLIO_QUERY = gql`
-  query GetPortfolio($investorId: ID!, $fundId: ID!) {
-    user(id: $investorId) {
-      id
-      name
-      holdings {
-        fundId
-        shares
-      }
+  query GetPortfolio($fundId: ID!) {
+    portfolio(fundId: $fundId, investorId: "1") {
+      investorId
+      fundId
+      shares
     }
     fund(id: $fundId) {
       intradayYield
-      currentNav
+      currentNAV {
+        nav
+      }
     }
   }
 `;
@@ -196,7 +169,7 @@ function FundActions({ fund, role, mintShares, redeemShares, data }) {
         return toast.error("Invalid amount");
       }
       
-      const nav = fund.currentNav;
+      const nav = fund.currentNAV.nav;
       const mintedShares = parseFloat((amount / nav).toFixed(2));
       
       const res = await mintShares({
@@ -242,421 +215,389 @@ function FundActions({ fund, role, mintShares, redeemShares, data }) {
       toast.error(`Redeem failed: ${err.message}`, getToastOptions(role));
     }
   };
-  
+
   return (
-    <div className="flex gap-2">
-      {role === 'INVESTOR' && (
-        <>
-          <button
-            className="bg-blue-600 text-white px-3 py-1 rounded-lg hover:bg-blue-700 transition flex items-center gap-2 text-sm"
-            onClick={handleMint}
-            onMouseEnter={() => setShowMintTooltip(true)}
-            onMouseLeave={() => setShowMintTooltip(false)}
-          >
-            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none">
-              <path d="M12 5V19M5 12H19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            Mint $500
-          </button>
-          <button
-            className="bg-indigo-600 text-white px-3 py-1 rounded-lg hover:bg-indigo-700 transition flex items-center gap-2 text-sm"
-            onClick={handleRedeem}
-            onMouseEnter={() => setShowRedeemTooltip(true)}
-            onMouseLeave={() => setShowRedeemTooltip(false)}
-          >
-            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none">
-              <path d="M5 12H19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            Redeem 10 Shares
-          </button>
-        </>
-      )}
+    <div className="flex flex-col sm:flex-row justify-center gap-3 mt-4">
+      <div className="relative">
+        <Button 
+          variant="primary"
+          onClick={handleMint}
+          disabled={role !== 'INVESTOR'}
+          className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 transition-colors duration-300"
+          onMouseEnter={() => setShowMintTooltip(true)}
+          onMouseLeave={() => setShowMintTooltip(false)}
+          onFocus={() => setShowMintTooltip(true)}
+          onBlur={() => setShowMintTooltip(false)}
+          aria-label="Mint new shares"
+          title="Mint new shares into the fund"
+        >
+          + Mint Shares
+        </Button>
+        {showMintTooltip && (
+          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 -translate-y-2 bg-gray-800 text-white text-sm px-3 py-1.5 rounded shadow-lg z-10 mb-1 whitespace-nowrap">
+            <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-1/2 rotate-45 w-2 h-2 bg-gray-800"></div>
+            <p>Mint new shares based on current NAV</p>
+          </div>
+        )}
+      </div>
+      
+      <div className="relative">
+        <Button 
+          variant="secondary"
+          onClick={handleRedeem}
+          className="w-full sm:w-auto bg-gray-600 hover:bg-gray-700 transition-colors duration-300 text-white"
+          onMouseEnter={() => setShowRedeemTooltip(true)}
+          onMouseLeave={() => setShowRedeemTooltip(false)}
+          onFocus={() => setShowRedeemTooltip(true)}
+          onBlur={() => setShowRedeemTooltip(false)}
+          aria-label="Redeem shares"
+          title="Redeem existing shares from the fund"
+        >
+          - Redeem Shares
+        </Button>
+        {showRedeemTooltip && (
+          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 -translate-y-2 bg-gray-800 text-white text-sm px-3 py-1.5 rounded shadow-lg z-10 mb-1 whitespace-nowrap">
+            <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-1/2 rotate-45 w-2 h-2 bg-gray-800"></div>
+            <p>Redeem your shares for underlying assets</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
-// Main Fund List Component that displays all available funds
 function FundList() {
-  const [selectedFundId, setSelectedFundId] = useState(null);
-  const { loading, error, data, refetch } = useQuery(FUNDS_QUERY, {
-    pollInterval: 15000, // Poll every 15 seconds
-  });
-  
-  const [mintShares] = useMutation(MINT_SHARES, {
-    refetchQueries: [{ query: FUNDS_QUERY }],
-  });
-  
-  const [redeemShares] = useMutation(REDEEM_SHARES, {
-    refetchQueries: [{ query: FUNDS_QUERY }],
-  });
-  
   const { role } = useRole();
+  const { loading, error, data, refetch } = useQuery(FUNDS_QUERY);
+  const [mintShares] = useMutation(MINT_SHARES);
+  const [redeemShares] = useMutation(REDEEM_SHARES);
   
-  // Auto-refresh
+  // Create state variables outside of the map function
+  const [prevNavMap, setPrevNavMap] = useState({});
+  const [prevYieldMap, setPrevYieldMap] = useState({});
+
+  useEffect(() => {
+    if (data?.allFunds) {
+      // Initialize or update the prev values
+      const newNavMap = {...prevNavMap};
+      const newYieldMap = {...prevYieldMap};
+      
+      data.allFunds.forEach(fund => {
+        if (!prevNavMap[fund.id] || prevNavMap[fund.id] !== fund.currentNAV.nav) {
+          newNavMap[fund.id] = fund.currentNAV.nav;
+        }
+        if (!prevYieldMap[fund.id] || prevYieldMap[fund.id] !== fund.intradayYield) {
+          newYieldMap[fund.id] = fund.intradayYield;
+        }
+      });
+      
+      setPrevNavMap(newNavMap);
+      setPrevYieldMap(newYieldMap);
+    }
+  }, [data]);
+
   useEffect(() => {
     const interval = setInterval(() => {
       refetch();
     }, 15000);
     return () => clearInterval(interval);
   }, [refetch]);
-  
-  if (loading) return (
-    <div className="space-y-3 animate-pulse">
-      {[1, 2].map(i => (
-        <div key={i} className="border border-gray-200 rounded-lg p-3 dark:border-gray-700">
-          <div className="h-6 bg-gray-200 rounded w-1/4 mb-2 dark:bg-gray-700"></div>
-          <div className="h-10 bg-gray-200 rounded w-3/4 mb-3 dark:bg-gray-700"></div>
-          <div className="h-24 bg-gray-200 rounded w-full dark:bg-gray-700"></div>
-        </div>
-      ))}
-    </div>
-  );
-  
-  if (error) return (
-    <div className="bg-red-50 border-l-4 border-red-500 p-4 dark:bg-red-950 dark:border-red-500">
-      <div className="flex">
-        <div className="flex-shrink-0">
-          <svg className="h-5 w-5 text-red-500" viewBox="0 0 20 20" fill="currentColor">
-            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-          </svg>
-        </div>
-        <div className="ml-3">
-          <h3 className="text-sm font-medium text-red-800 dark:text-red-200">Error loading funds</h3>
-          <div className="mt-2 text-sm text-red-700 dark:text-red-300">
-            <p>{error.message}</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-  
-  const funds = data?.allFunds || [];
-  
-  if (funds.length === 0) return <div>No funds available.</div>;
-  
-  // If no fund is selected, select the first one
-  useEffect(() => {
-    if (funds.length > 0 && !selectedFundId) {
-      setSelectedFundId(funds[0].id);
-    }
-  }, [funds, selectedFundId]);
-  
-  // Get the selected fund
-  const selectedFund = funds.find(fund => fund.id === selectedFundId) || funds[0];
-  
-  const lastUpdate = formatTime(new Date().toISOString());
-  
-  // Format the inception date
-  const formattedInceptionDate = selectedFund.inceptionDate ? 
-    new Date(selectedFund.inceptionDate).toLocaleDateString('en-US', { 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
-    }) : 'N/A';
-  
-  // Format yield history for charts
-  const yieldHistory = selectedFund.yieldHistory.slice(-100).map(item => ({
-    time: item.timestamp,
-    value: item.yield,
-  }));
-  
-  // Format NAV history for charts
-  const navHistory = selectedFund.navHistory ? selectedFund.navHistory.slice(-100).map(item => ({
-    time: item.timestamp,
-    value: item.nav,
-  })) : [];
-  
-  return (
-    <div className="space-y-5">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {funds.map(fund => (
-          <FundCard 
-            key={fund.id} 
-            fund={fund} 
-            onClick={(id) => setSelectedFundId(id)}
-            isSelected={fund.id === selectedFundId}
-          />
-        ))}
-      </div>
-      
-      <Card className="relative">
-        <CardContent>
-          <div className="flex justify-between items-start mb-3">
-            <div>
-              <h3 className="text-lg font-medium">{selectedFund.name}</h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                {selectedFund.assetType} • {selectedFund.chainId} • Inception: {formattedInceptionDate}
-              </p>
-            </div>
-            <FundActions
-              fund={selectedFund}
-              role={role}
-              mintShares={mintShares}
-              redeemShares={redeemShares}
-              data={data}
-            />
-          </div>
-          
-          <div className="grid md:grid-cols-3 gap-4 mb-4">
-            <div className="bg-white dark:bg-gray-800 p-3 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700">
-              <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Current NAV</div>
-              <div className="text-2xl font-bold flex items-center">
-                <CountUp
-                  start={selectedFund.currentNav - 0.1}
-                  end={selectedFund.currentNav}
-                  duration={0.5}
-                  decimals={2}
-                  prefix="$"
-                />
-                <DeltaBadge className="ml-2" 
-                  value={(selectedFund.navHistory && selectedFund.navHistory.length > 1) 
-                    ? selectedFund.currentNav - selectedFund.navHistory[selectedFund.navHistory.length - 2].nav 
-                    : 0} 
-                />
-              </div>
-            </div>
-            
-            <div className="bg-white dark:bg-gray-800 p-3 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700">
-              <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Intraday Yield</div>
-              <div className="text-2xl font-bold flex items-center">
-                <CountUp
-                  start={selectedFund.intradayYield - 0.01}
-                  end={selectedFund.intradayYield}
-                  duration={0.5}
-                  decimals={3}
-                  suffix="%"
-                />
-                <YieldBadge className="ml-2" value={0.01} />
-              </div>
-            </div>
-            
-            <div className="bg-white dark:bg-gray-800 p-3 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700">
-              <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Total AUM</div>
-              <div className="text-2xl font-bold">
-                {formatAUM(selectedFund.totalAum)}
-              </div>
-            </div>
-          </div>
-          
-          <div className="h-72 w-full">
-            <DualChart yieldData={yieldHistory} navData={navHistory} />
-          </div>
-          
-          <div className="text-right text-xs text-gray-500 mt-2 dark:text-gray-400">
-            Last Updated: {lastUpdate}
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
 
-// Portfolio panel to display user's holdings of a specific fund
-function PortfolioPanel({ fundId }) {
-  const { loading, error, data } = useQuery(PORTFOLIO_QUERY, {
-    variables: { investorId: '1', fundId },
-    pollInterval: 5000,
-  });
-  
-  if (loading) return (
-    <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-3 animate-pulse">
-      <div className="h-5 bg-gray-200 dark:bg-gray-700 rounded w-1/3 mb-2"></div>
-      <div className="space-y-2">
-        <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded"></div>
-        <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded"></div>
-      </div>
-    </div>
-  );
-  
-  if (error) return (
-    <div className="bg-red-50 dark:bg-red-900/20 p-3 rounded-lg text-sm text-red-600 dark:text-red-400">
-      Error loading portfolio: {error.message}
-    </div>
-  );
-  
-  if (!data?.user) return (
-    <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 text-center text-gray-500 dark:text-gray-400">
-      No portfolio data available. Try minting some shares.
-    </div>
-  );
-  
-  const holdings = data.user.holdings.find(h => h.fundId === fundId);
-  
-  // If no holdings for this fund
-  if (!holdings || !holdings.shares) {
+  if (loading) return <div className="text-center py-4 text-sm text-gray-400 dark:text-gray-500 animate-pulse">Loading...</div>;
+
+  if (error) {
     return (
-      <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 text-center">
-        <p className="text-gray-500 dark:text-gray-400">You don't own any shares of this fund yet.</p>
-        <button className="mt-2 text-sm text-blue-600 dark:text-blue-400 hover:underline">
-          Mint shares to get started
-        </button>
+      <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 p-4 rounded-md mx-4 my-6">
+        <strong className="block mb-1">GraphQL Error:</strong>
+        <span>{error.message}</span>
       </div>
     );
   }
-  
-  const shares = holdings.shares;
-  const nav = data.fund.currentNav;
-  const yield_ = data.fund.intradayYield;
-  const value = shares * nav;
-  
-  // Calculate accrued yield
-  const dailyYield = value * (yield_ / 100) / 365; // Daily yield
-  
+
   return (
-    <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-      <div className="p-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
-        <h3 className="font-medium">Your Portfolio</h3>
-      </div>
-      <div className="p-3 space-y-3">
-        <div className="flex justify-between items-center">
-          <div className="text-sm text-gray-600 dark:text-gray-400">Shares Owned</div>
-          <div className="font-medium">{shares.toFixed(2)}</div>
-        </div>
-        <div className="flex justify-between items-center">
-          <div className="text-sm text-gray-600 dark:text-gray-400">Current Value</div>
-          <div className="font-medium">{formatUSD(value)}</div>
-        </div>
-        <div className="flex justify-between items-center">
-          <div className="text-sm text-gray-600 dark:text-gray-400">Intraday Yield</div>
-          <div className="font-medium">{yield_.toFixed(4)}%</div>
-        </div>
-        <div className="flex justify-between items-center">
-          <div className="text-sm text-gray-600 dark:text-gray-400">Accrued Today</div>
-          <AccruedYield value={dailyYield} />
-        </div>
-      </div>
+    <div className="grid gap-6 px-4 sm:px-6 md:px-10 lg:px-32 max-w-5xl mx-auto">
+      {data.allFunds.map((fund) => {
+        // Use the stored previous values
+        const prevNav = prevNavMap[fund.id] || fund.currentNAV.nav;
+        const prevYield = prevYieldMap[fund.id] || fund.intradayYield;
+        
+        return (
+          <Card key={fund.id} className="rounded-2xl shadow-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+            <CardContent className="space-y-3 p-4 sm:p-6">
+              <h2 className="text-xl sm:text-2xl font-bold text-blue-600 dark:text-blue-400">{fund.name}</h2>
+              <div className="text-sm text-gray-500 dark:text-gray-400 grid grid-cols-2 gap-x-6 gap-y-1">
+                <p>Asset Type: <span className="font-medium">{fund.assetType}</span></p>
+                <p>Chain: <span className="font-medium">{fund.chainId}</span></p>
+                {fund.inceptionDate && <p>Inception: <span className="font-medium">{new Date(fund.inceptionDate).toLocaleDateString()}</span></p>}
+                <p>Fund ID: <span className="font-medium">{fund.id}</span></p>
+              </div>
+              <p className="text-lg font-medium flex items-center gap-2">
+                NAV:{' '}
+                <span 
+                  className={`font-semibold transition-all duration-500 ${
+                    (fund.currentNAV?.nav ?? 0) > (prevNav ?? 0) 
+                      ? "text-green-600 dark:text-green-400" 
+                      : (fund.currentNAV?.nav ?? 0) < (prevNav ?? 0) 
+                        ? "text-red-600 dark:text-red-400" 
+                        : "text-emerald-700 dark:text-emerald-400"
+                  }`}
+                >
+                  <CountUp
+                    end={fund.currentNAV?.nav ?? 0}
+                    duration={0.75}
+                    decimals={2}
+                    prefix="$"
+                    separator=","
+                  />
+                </span>
+                <DeltaBadge nav={fund.currentNAV?.nav} fundId={fund.id} />
+              </p>
+              
+              <p className="text-sm text-muted-foreground">
+                Total AUM:{' '}
+                <span className="font-semibold text-black dark:text-white">
+                  {formatAUM(fund.totalAum)}
+                </span>
+              </p>
+              
+              {/* Intraday Yield Display */}
+              <div className="flex items-center">
+                <p className="text-sm text-gray-700 flex items-center flex-wrap">
+                  <span className="font-semibold">Intraday Yield: </span>
+                  <span 
+                    className={`ml-1 font-semibold transition-all duration-500 ${
+                      (fund.intradayYield ?? 0) >= 0
+                        ? "text-green-700 dark:text-green-400"
+                        : "text-red-600 dark:text-red-400"
+                    } ${
+                      (fund.intradayYield ?? 0) > (prevYield ?? 0)
+                        ? "animate-pulse"
+                        : (fund.intradayYield ?? 0) < (prevYield ?? 0)
+                          ? "animate-pulse"
+                          : ""
+                    }`}
+                  >
+                    {(fund.intradayYield ?? 0) >= 0 ? "+" : ""}
+                    <CountUp
+                      end={fund.intradayYield ?? 0}
+                      duration={0.75}
+                      suffix="%"
+                      decimals={2}
+                    />
+                    {(fund.intradayYield ?? 0) > (prevYield ?? 0)
+                      ? '↑'
+                      : (fund.intradayYield ?? 0) < (prevYield ?? 0)
+                        ? '↓'
+                        : ''}
+                  </span>
+                </p>
+              </div>
+              
+              <p className="text-sm text-gray-400 dark:text-gray-500">
+                Updated: {timeAgo(fund.currentNAV.timestamp)}
+              </p>
+              
+              {/* Chart display */}
+              <DualChart fundId={fund.id} />
+              
+              {role === 'INVESTOR' && (
+                <>
+                  <PortfolioPanel fundId={fund.id} />
+                  <FundActions 
+                    fund={fund} 
+                    role={role} 
+                    mintShares={mintShares} 
+                    redeemShares={redeemShares} 
+                    data={data}
+                  />
+                </>
+              )}
+              {role === 'ADMIN' && (
+                <>
+                  <AuditLog fundId={fund.id} />
+                  <div className="mt-4">
+                    <Button
+                      variant="secondary"
+                      onClick={() => window.open('/print-report', '_blank')}
+                      className="flex items-center gap-1"
+                    >
+                      🖨️ Print Audit Report
+                    </Button>
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        );
+      })}
     </div>
   );
 }
 
-// Audit log panel for admins
+function PortfolioPanel({ fundId }) {
+  const { loading, error, data } = useQuery(PORTFOLIO_QUERY, {
+    variables: { fundId },
+    skip: !fundId,
+  });
+
+  // Calculate values for display
+  const yieldPercentage = data?.fund?.intradayYield || 0;
+  const accruedToday = data?.portfolio?.shares 
+    ? ((data.fund.intradayYield / 100) * data.fund.currentNAV.nav * data.portfolio.shares)
+    : 0;
+  
+  const formattedAccrued = new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+  }).format(accruedToday);
+
+  return (
+    <Card className="mb-4">
+      <h3 className="font-medium mb-2 text-gray-700 dark:text-gray-300">Your Portfolio</h3>
+      {loading ? (
+        <div className="space-y-2">
+          <Skeleton className="h-5 w-1/2" />
+          <Skeleton className="h-4 w-3/4" />
+        </div>
+      ) : error ? (
+        <p className="text-sm text-red-500 dark:text-red-400">Failed to load portfolio data</p>
+      ) : !data?.portfolio ? (
+        <p className="text-sm text-gray-500 dark:text-gray-400">No portfolio data found</p>
+      ) : (
+        <Card className="rounded-xl border border-gray-200 shadow-sm bg-white">
+          <CardContent className="flex flex-col sm:flex-row sm:items-center sm:justify-between px-5 py-4 gap-4">
+
+            {/* Shares held */}
+            <div className="flex items-center gap-2 text-green-700 font-medium text-sm sm:text-base whitespace-nowrap">
+              ✅ You hold <span className="font-semibold text-green-800">{data.portfolio.shares.toFixed(2)}</span> shares
+            </div>
+
+            {/* Stats */}
+            <div className="flex items-center divide-x divide-gray-200 text-sm sm:text-base text-right">
+              
+              <div className="px-4">
+                <p className="text-gray-500">Intraday Yield</p>
+                <p className="text-blue-600 font-semibold">
+                  <CountUp end={yieldPercentage} suffix="%" decimals={2} duration={0.75} />
+                </p>
+              </div>
+
+              <div className="px-4">
+                <p className="text-gray-500">Accrued Today</p>
+                <p className="text-green-700 font-semibold">
+                  {formattedAccrued}
+                </p>
+              </div>
+
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </Card>
+  );
+}
+
 function AuditLog({ fundId }) {
+  const [filter, setFilter] = useState("ALL");
   const { loading, error, data } = useQuery(AUDIT_LOGS_QUERY, {
     variables: { fundId },
-    pollInterval: 15000,
+    skip: !fundId,
+    pollInterval: 30000, 
   });
-  
-  if (loading) return (
-    <div className="space-y-2 animate-pulse">
-      {[1, 2, 3].map(i => (
-        <div key={i} className="h-8 bg-gray-200 dark:bg-gray-700 rounded"></div>
-      ))}
-    </div>
-  );
-  
-  if (error) return (
-    <div className="bg-red-50 dark:bg-red-900/20 p-3 rounded-lg text-sm text-red-600 dark:text-red-400">
-      Error loading audit logs: {error.message}
-    </div>
-  );
-  
-  if (!data?.auditLogs || data.auditLogs.length === 0) {
-    return <div className="text-gray-500 dark:text-gray-400 text-center py-3">No audit logs available.</div>;
-  }
-  
+
+  const filteredLogs = data?.auditLogs?.filter(
+    log => filter === "ALL" || log.action === filter
+  ) || [];
+
   return (
-    <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-      <div className="p-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
-        <h3 className="font-medium">Recent Activity</h3>
+    <Card>
+      <div className="flex justify-between items-center mb-3">
+        <h3 className="font-medium text-gray-700 dark:text-gray-300">Audit Log</h3>
+        <select 
+          onChange={(e) => setFilter(e.target.value)} 
+          value={filter}
+          className="text-sm border rounded p-1 bg-white dark:bg-gray-700 dark:text-gray-200"
+        >
+          <option value="ALL">All</option>
+          <option value="NAV_UPDATE">NAV Updates</option>
+          <option value="MINT">Mint</option>
+          <option value="REDEEM">Redeem</option>
+        </select>
       </div>
-      <div className="divide-y divide-gray-200 dark:divide-gray-700 max-h-[400px] overflow-y-auto">
-        {data.auditLogs.slice(0, 10).map(log => (
-          <div key={log.id} className="p-3 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-            <div className="flex justify-between">
-              <span className="font-medium text-gray-900 dark:text-gray-100">{log.action}</span>
-              <span className="text-xs text-gray-500 dark:text-gray-400">{timeAgo(log.timestamp)}</span>
+      
+      {loading ? (
+        <div className="space-y-3">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="flex flex-col space-y-1">
+              <div className="flex justify-between">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-4 w-16" />
+              </div>
+              <Skeleton className="h-3 w-full" />
+              <Skeleton className="h-3 w-3/4" />
             </div>
-            <div className="text-sm text-gray-600 dark:text-gray-400">By {log.actor}</div>
-            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              {log.metadata && typeof log.metadata === 'object' && (
-                <ul className="space-y-1">
-                  {Object.entries(log.metadata).map(([key, value]) => (
-                    <li key={key}>
-                      <span className="font-medium">{key}:</span> {
-                        typeof value === 'object' 
-                          ? JSON.stringify(value) 
-                          : value.toString()
-                      }
-                    </li>
-                  ))}
-                </ul>
-              )}
+          ))}
+        </div>
+      ) : error ? (
+        <p className="text-sm text-red-500 dark:text-red-400">Failed to load audit logs</p>
+      ) : !filteredLogs.length ? (
+        <p className="text-sm text-gray-500 dark:text-gray-400">No audit logs available</p>
+      ) : (
+        <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
+          {filteredLogs.map((log) => (
+            <div key={log.id} className="border-b border-gray-100 dark:border-gray-700 pb-2 last:border-0">
+              <div className="flex justify-between text-xs">
+                <span className="text-gray-500 dark:text-gray-400">{formatTime(log.timestamp)}</span>
+                <span className="font-medium text-gray-700 dark:text-gray-300">{log.actor}</span>
+              </div>
+              <p className="text-sm mt-1">{log.action}</p>
+              {log.metadata && <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{JSON.stringify(log.metadata)}</p>}
             </div>
-          </div>
-        ))}
-      </div>
-    </div>
+          ))}
+        </div>
+      )}
+    </Card>
   );
 }
 
 export default function App() {
   const [role, setRole] = useState('INVESTOR');
-  const [darkMode, setDarkMode] = useState(() => {
-    // Check for saved preference, default to system preference
-    const saved = localStorage.getItem('darkMode');
-    if (saved) return saved === 'true';
-    return window.matchMedia('(prefers-color-scheme: dark)').matches;
-  });
-  
+
   useEffect(() => {
-    // Apply the dark mode class to the document
-    if (darkMode) {
+    // Add transition classes to body when component mounts
+    document.body.classList.add('transition-colors', 'duration-300');
+    
+    return () => {
+      // Clean up when component unmounts
+      document.body.classList.remove('transition-colors', 'duration-300');
+    };
+  }, []);
+  
+  // Function to toggle dark mode with smooth transition
+  const toggleDarkMode = () => {
+    document.documentElement.classList.toggle('dark');
+    localStorage.setItem('darkMode', document.documentElement.classList.contains('dark'));
+  };
+  
+  // Check for saved preference on initial load
+  useEffect(() => {
+    if (localStorage.getItem('darkMode') === 'true' || 
+        (!localStorage.getItem('darkMode') && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
       document.documentElement.classList.add('dark');
     } else {
       document.documentElement.classList.remove('dark');
     }
-    // Save preference
-    localStorage.setItem('darkMode', darkMode);
-  }, [darkMode]);
-  
-  // Handler for preventing button focus
-  const preventFocus = (e) => {
-    e.preventDefault();
-    if (e.relatedTarget) {
-      e.relatedTarget.blur();
-    }
-    if (e.currentTarget) {
-      e.currentTarget.blur();
-    }
-  };
-  
-  // Switch role between investor and admin
-  const toggleRole = () => {
-    setRole(role === 'INVESTOR' ? 'ADMIN' : 'INVESTOR');
-    toast.success(
-      `Switched to ${role === 'INVESTOR' ? 'ADMIN' : 'INVESTOR'} mode`,
-      getToastOptions(role === 'INVESTOR' ? 'ADMIN' : 'INVESTOR')
-    );
-  };
-  
-  // Toggle dark/light mode
-  const toggleDarkMode = () => {
-    setDarkMode(!darkMode);
-  };
-  
+  }, []);
+
   return (
-    <RoleContext.Provider value={{ role, setRole }}>
-      <div className="flex flex-col min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
-        <Header
-          role={role} 
-          toggleRole={toggleRole}
-          darkMode={darkMode}
-          toggleDarkMode={toggleDarkMode}
-        />
-        
-        <main className="container mx-auto px-4 py-6 flex-grow">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <div className="lg:col-span-2">
-              <FundList />
-            </div>
-            <div className="space-y-4">
-              <PortfolioPanel fundId="F1" />
-              {role === 'ADMIN' && <AuditLog fundId="F1" />}
-            </div>
-          </div>
-        </main>
-      </div>
-      <Toaster />
-    </RoleContext.Provider>
+    <ApolloProvider client={client}>
+      <RoleContext.Provider value={{ role, setRole }}>
+        <Toaster position="bottom-right" />
+        <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-200 transition-colors duration-300">
+          <Header onToggleTheme={toggleDarkMode} />
+          <FundList />
+        </div>
+      </RoleContext.Provider>
+    </ApolloProvider>
   );
 }

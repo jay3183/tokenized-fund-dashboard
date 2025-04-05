@@ -1,30 +1,32 @@
 /**
- * Formats a number as USD currency
- * @param {number} value - The number to format
- * @returns {string} Formatted currency string
+ * Format a numerical value as USD currency
+ * @param {number} amount - The amount to format
+ * @returns {string} Formatted currency string with $ sign
  */
-export function formatUSD(value) {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
+export const formatUSD = (amount) => {
+  if (amount == null) return '$0.00';
+  return `$${amount.toLocaleString(undefined, {
     minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  }).format(value);
-}
+    maximumFractionDigits: 2,
+  })}`;
+};
 
 /**
- * Formats large numbers as millions or billions with appropriate suffixes
- * @param {number} value - The AUM value to format
- * @returns {string} Formatted AUM string
+ * Format a large numerical value as currency in a compact format (e.g., $22.4M)
+ * @param {number} amount - The amount to format
+ * @returns {string} Formatted currency string in a compact, executive-friendly format
  */
-export function formatAUM(value) {
-  if (value >= 1_000_000_000) {
-    return `$${(value / 1_000_000_000).toFixed(2)}B`;
-  } else if (value >= 1_000_000) {
-    return `$${(value / 1_000_000).toFixed(2)}M`;
-  } else if (value >= 1_000) {
-    return `$${(value / 1_000).toFixed(2)}K`;
+export const formatAUM = (amount) => {
+  // Handle null or undefined values
+  if (amount == null) return '$0';
+  
+  if (amount >= 1e9) {
+    return `$${(amount / 1e9).toFixed(1)}B`;
+  } else if (amount >= 1e6) {
+    return `$${(amount / 1e6).toFixed(1)}M`;
+  } else if (amount >= 1e3) {
+    return `$${(amount / 1e3).toFixed(1)}K`;
   } else {
-    return formatUSD(value);
+    return `$${amount.toFixed(0)}`;
   }
-} 
+}; 
