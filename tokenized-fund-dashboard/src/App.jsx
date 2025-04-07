@@ -1,12 +1,14 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ApolloClient,
   InMemoryCache,
   ApolloProvider,
   gql,
   useQuery,
-  useMutation
+  useMutation,
+  useApolloClient
 } from '@apollo/client';
+import { Routes, Route, Navigate, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import toast, { Toaster } from 'react-hot-toast';
 import { Card, CardContent, Button, Tooltip, InfoIcon } from './components/ui';
 import NavChart from './components/NavChart';
@@ -17,26 +19,163 @@ import YieldBadge from './components/YieldBadge';
 import AccruedYield from './components/AccruedYield';
 import PortfolioPanel from './components/PortfolioPanel';
 import Header from './components/Header';
+import Home from './pages/Home';
+import Login from './pages/Login';
 import { formatUSD, formatAUM } from './utils/formatCurrency';
+import { formatNumber, formatCurrency } from './utils/formatNumber';
 import CountUp from 'react-countup';
 import { format, parseISO } from 'date-fns';
 import { timeAgo } from './utils/timeAgo';
-import { useRole } from './RoleContext';
+import { useAuth } from './contexts/AuthContext';
+import { PortfolioProvider } from './contexts/PortfolioContext';
+import './App.css';
+import FundCard from './components/FundCard';
+import { ApolloError } from '@apollo/client';
+import FundDetails from './components/FundDetails';
+import FundStats from './components/FundStats';
+import AppFundActions from './components/FundActions';
+import InlineFundActionsComponent from './components/InlineFundActions';
+import NavYieldOverview from './components/NavYieldOverview';
+import PortfolioBalance from './components/PortfolioBalance';
+import AnnualYieldPanel from './components/AnnualYieldPanel';
+import TransactionHistory from './components/TransactionHistory';
+import MiniPerformanceChart from './components/MiniPerformanceChart';
+import AdminPage from './pages/AdminPage';
+import ManagerPage from './pages/ManagerPage';
+import FundList from './components/FundList';
+import InvestorDashboard from './pages/InvestorDashboard';
+import PrivateRoute from './components/PrivateRoute';
+import AdminLayout from './layouts/AdminLayout';
+import AdminDashboard from './pages/admin/AdminDashboard';
+import InvestorLayout from './layouts/InvestorLayout';
+
+// Placeholder components for routing
+const PublicLayout = ({ children }) => (
+  <div className="flex flex-col min-h-screen">
+    <main className="flex-grow">
+      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        {children || <Outlet />}
+      </div>
+    </main>
+  </div>
+);
+
+const DashboardLayout = ({ children }) => (
+  <div className="flex flex-col min-h-screen">
+    <main className="flex-grow">
+      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        {children || <Outlet />}
+      </div>
+    </main>
+  </div>
+);
+
+// Define a helper function to get dashboard path based on role
+export function getDashboardByRole(role) {
+  switch (role) {
+    case ROLES.INVESTOR:
+      return '/investor';
+    case ROLES.MANAGER:
+      return '/manager';
+    case ROLES.ADMIN:
+      return '/admin';
+    default:
+      return '/login';
+  }
+}
+
+const LoginPage = () => <Login />;
+const HomePage = () => <Home />;
+const SignupPage = () => <div>Signup Page</div>;
+const AboutPage = () => <div>About Page</div>;
+const ForgotPasswordPage = () => <div>Forgot Password Page</div>;
+const Dashboard = () => <div>Main Dashboard</div>;
+const FundDetail = () => <div>Fund Detail</div>;
+const PortfolioPage = () => <div>Portfolio Page</div>;
+const SettingsPage = () => <div>Settings Page</div>;
+const SupportPage = () => <div>Support Page</div>;
+const NotFoundPage = () => (
+  <div className="text-center py-12">
+    <h1 className="text-4xl font-bold mb-6">404 - Page Not Found</h1>
+    <p className="text-xl mb-8">The page you are looking for does not exist.</p>
+  </div>
+);
+
+// Define the roles constant
+export const ROLES = {
+  INVESTOR: 'INVESTOR',
+  MANAGER: 'MANAGER',
+  ADMIN: 'ADMIN'
+};
 
 // Helper function for formatting timestamps consistently
 function formatTime(timestamp) {
-  const date = new Date(timestamp);
-  return date.toLocaleString([], { 
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit', 
-    minute: '2-digit', 
-    hour12: true 
-  });
+  if (!timestamp) return 'N/A';
+  
+  try {
+    // Handle both string and numeric timestamps
+    let date;
+    
+    if (typeof timestamp === 'number' || /^\d+$/.test(timestamp)) {
+      // Handle numeric timestamp (Unix epoch)
+      date = new Date(parseInt(timestamp, 10));
+    } else {
+      // Handle ISO string format timestamp
+      date = new Date(timestamp);
+    }
+    
+    // Check if the date is valid before formatting
+    if (isNaN(date.getTime())) {
+      console.error('Invalid timestamp:', timestamp);
+      return 'Invalid Date';
+    }
+    
+    return date.toLocaleString([], { 
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit', 
+      minute: '2-digit', 
+      hour12: true 
+    });
+  } catch (error) {
+    console.error('Error formatting timestamp:', timestamp, error);
+    return 'Invalid Date';
+  }
+}
+
+// Helper function for formatting percentages
+function formatPercentage(value, digits = 2) {
+  if (value === null || value === undefined || isNaN(value)) {
+    return '0.00%';
+  }
+  
+  return `${value.toFixed(digits)}%`;
+}
+
+// Helper function for formatting dates
+function formatDate(dateString) {
+  if (!dateString) return 'N/A';
+  
+  try {
+    const date = new Date(dateString);
+    return format(date, 'MMM d, yyyy');
+  } catch (error) {
+    console.error('Error formatting date:', dateString, error);
+    return 'Invalid Date';
+  }
+}
+
+// Helper function for formatting dollar amounts
+function formatDollarAmount(amount) {
+  if (amount === null || amount === undefined || isNaN(amount)) {
+    return '$0.00';
+  }
+  
+  return formatCurrency(amount);
 }
 
 const client = new ApolloClient({
-  uri: import.meta.env.VITE_GRAPHQL_API,
+  uri: import.meta.env.VITE_GRAPHQL_API || 'http://localhost:4000/graphql',
   cache: new InMemoryCache(),
 });
 
@@ -49,6 +188,8 @@ const FUNDS_QUERY = gql`
       assetType
       inceptionDate
       intradayYield
+      currentNav
+      previousNav
       totalAum
       yieldHistory {
         timestamp
@@ -97,13 +238,15 @@ const AUDIT_LOGS_QUERY = gql`
 `;
 
 export const PORTFOLIO_QUERY = gql`
-  query GetPortfolio($fundId: ID!) {
-    portfolio(fundId: $fundId, investorId: "1") {
+  query GetPortfolio($fundId: ID!, $investorId: ID!) {
+    portfolio(fundId: $fundId, investorId: $investorId) {
       investorId
       fundId
       shares
     }
     fund(id: $fundId) {
+      currentNav
+      previousNav
       intradayYield
       currentNAV {
         nav
@@ -159,12 +302,28 @@ const getToastOptions = (role) => {
 };
 
 // Separate component to handle fund actions with tooltips
-function FundActions({ fund, role, mintShares, redeemShares, data }) {
+function InlineFundActions({ fund, mintShares, redeemShares, data }) {
+  const { isAuthenticated, user, role } = useAuth();
+  const apolloClient = useApolloClient();
   const [showMintTooltip, setShowMintTooltip] = useState(false);
   const [showRedeemTooltip, setShowRedeemTooltip] = useState(false);
   const [showWithdrawTooltip, setShowWithdrawTooltip] = useState(false);
+  const [showAuditTooltip, setShowAuditTooltip] = useState(false);
+  const [withdrawLoading, setWithdrawLoading] = useState(false);
   
+  // Only allow investor actions if authenticated with proper role
+  const canPerformInvestorActions = isAuthenticated && user && role === 'INVESTOR';
+  const canViewAuditInfo = role === 'ADMIN' || role === 'MANAGER';
+  
+  const fundId = fund.id;
+  const investorId = user?.id || localStorage.getItem('userId');
+
   const handleMint = async () => {
+    if (!canPerformInvestorActions) {
+      toast.error("Permission denied: Only investors can mint shares");
+      return;
+    }
+    
     try {
       const amount = 500;
       if (amount <= 0 || isNaN(amount)) {
@@ -178,7 +337,7 @@ function FundActions({ fund, role, mintShares, redeemShares, data }) {
         variables: { 
           input: {
             fundId: fund.id, 
-            investorId: '1', 
+            investorId: investorId, 
             amountUsd: amount
           }
         },
@@ -191,10 +350,16 @@ function FundActions({ fund, role, mintShares, redeemShares, data }) {
     } catch (err) {
       console.error('Mint failed:', err);
       toast.error(`Mint failed: ${err.message}`, getToastOptions(role));
+      return;
     }
   };
   
   const handleRedeem = async () => {
+    if (!canPerformInvestorActions) {
+      toast.error("Permission denied: Only investors can redeem shares");
+      return;
+    }
+    
     try {
       const redeemedShares = 10;
       if (redeemedShares <= 0 || isNaN(redeemedShares)) {
@@ -205,7 +370,7 @@ function FundActions({ fund, role, mintShares, redeemShares, data }) {
         variables: { 
           input: {
             fundId: fund.id, 
-            investorId: '1', 
+            investorId: investorId, 
             shares: redeemedShares
           }
         },
@@ -215,34 +380,44 @@ function FundActions({ fund, role, mintShares, redeemShares, data }) {
     } catch (err) {
       console.error('Redeem failed:', err);
       toast.error(`Redeem failed: ${err.message}`, getToastOptions(role));
+      return;
     }
   };
 
   const handleWithdrawYield = async () => {
+    if (!canPerformInvestorActions) {
+      toast.error("Permission denied: Only investors can withdraw yield");
+      return;
+    }
+    
+    // No investor ID indicates we're not authenticated
+    if (!investorId) {
+      toast.error("Please log in to withdraw yield", getToastOptions(role));
+      return;
+    }
+    
+    setWithdrawLoading(true);
     try {
-      const response = await fetch('http://localhost:4000/graphql', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          query: `
-            mutation WithdrawYield($investorId: ID!, $fundId: ID!) {
-              withdrawYield(investorId: $investorId, fundId: $fundId) {
-                amount
-                timestamp
-              }
+      // Use client to execute GraphQL mutation directly
+      const client = apolloClient;
+      const result = await client.mutate({
+        mutation: gql`
+          mutation WithdrawYield($investorId: ID!, $fundId: ID!) {
+            withdrawYield(investorId: $investorId, fundId: $fundId) {
+              amount
+              timestamp
             }
-          `,
-          variables: {
-            investorId: '1',
-            fundId: fund.id
           }
-        })
+        `,
+        variables: {
+          investorId,
+          fundId
+        }
       });
-
-      const result = await response.json();
-      console.log('Yield withdrawn:', result);
       
-      if (result.data && result.data.withdrawYield) {
+      setWithdrawLoading(false);
+      
+      if (result.data?.withdrawYield) {
         const { amount, timestamp } = result.data.withdrawYield;
         toast.success(`Successfully withdrawn $${amount.toFixed(2)} yield!`, 
           getToastOptions(role)
@@ -253,265 +428,135 @@ function FundActions({ fund, role, mintShares, redeemShares, data }) {
     } catch (err) {
       console.error('❌ Withdraw yield failed:', err);
       toast.error(`Withdraw yield failed: ${err.message}`, getToastOptions(role));
+      setWithdrawLoading(false);
+      return;
     }
   };
 
   return (
     <div className="flex flex-col sm:flex-row justify-center gap-3 mt-4">
-      <div className="relative">
-        <Button 
-          variant="primary"
-          onClick={handleMint}
-          disabled={role !== 'INVESTOR'}
-          className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 transition-colors duration-300"
-          onMouseEnter={() => setShowMintTooltip(true)}
-          onMouseLeave={() => setShowMintTooltip(false)}
-          onFocus={() => setShowMintTooltip(true)}
-          onBlur={() => setShowMintTooltip(false)}
-          aria-label="Mint new shares"
-          title="Mint new shares into the fund"
-        >
-          + Mint Shares
-        </Button>
-        {showMintTooltip && (
-          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 -translate-y-2 bg-gray-800 text-white text-sm px-3 py-1.5 rounded shadow-lg z-10 mb-1 whitespace-nowrap">
-            <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-1/2 rotate-45 w-2 h-2 bg-gray-800"></div>
-            <p>Mint new shares based on current NAV</p>
-          </div>
-        )}
-      </div>
-      
-      <div className="relative">
-        <Button 
-          variant="secondary"
-          onClick={handleRedeem}
-          className="w-full sm:w-auto bg-gray-600 hover:bg-gray-700 transition-colors duration-300 text-white"
-          onMouseEnter={() => setShowRedeemTooltip(true)}
-          onMouseLeave={() => setShowRedeemTooltip(false)}
-          onFocus={() => setShowRedeemTooltip(true)}
-          onBlur={() => setShowRedeemTooltip(false)}
-          aria-label="Redeem shares"
-          title="Redeem existing shares from the fund"
-        >
-          - Redeem Shares
-        </Button>
-        {showRedeemTooltip && (
-          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 -translate-y-2 bg-gray-800 text-white text-sm px-3 py-1.5 rounded shadow-lg z-10 mb-1 whitespace-nowrap">
-            <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-1/2 rotate-45 w-2 h-2 bg-gray-800"></div>
-            <p>Redeem your shares for underlying assets</p>
-          </div>
-        )}
-      </div>
-      
-      <div className="relative">
-        <Button 
-          variant="primary"
-          onClick={handleWithdrawYield}
-          className="w-full sm:w-auto bg-amber-500 hover:bg-amber-600 transition-colors duration-300 text-white"
-          onMouseEnter={() => setShowWithdrawTooltip(true)}
-          onMouseLeave={() => setShowWithdrawTooltip(false)}
-          onFocus={() => setShowWithdrawTooltip(true)}
-          onBlur={() => setShowWithdrawTooltip(false)}
-          aria-label="Withdraw accrued yield"
-          title="Withdraw accrued yield from the fund"
-        >
-          Withdraw Yield
-        </Button>
-        {showWithdrawTooltip && (
-          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 -translate-y-2 bg-gray-800 text-white text-sm px-3 py-1.5 rounded shadow-lg z-10 mb-1 whitespace-nowrap">
-            <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-1/2 rotate-45 w-2 h-2 bg-gray-800"></div>
-            <p>Withdraw accrued yield from your investment</p>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function FundList() {
-  const { role } = useRole();
-  const { loading, error, data, refetch } = useQuery(FUNDS_QUERY);
-  const [mintShares] = useMutation(MINT_SHARES);
-  const [redeemShares] = useMutation(REDEEM_SHARES);
-  const [accruedToday, setAccruedToday] = useState(164.77); // simulate accrued yield
-  
-  console.log('FundList - Current Role:', role);
-  
-  // Create state variables outside of the map function
-  const [prevNavMap, setPrevNavMap] = useState({});
-  const [prevYieldMap, setPrevYieldMap] = useState({});
-
-  useEffect(() => {
-    if (data?.allFunds) {
-      // Initialize or update the prev values
-      const newNavMap = {...prevNavMap};
-      const newYieldMap = {...prevYieldMap};
-      
-      data.allFunds.forEach(fund => {
-        if (!prevNavMap[fund.id] || prevNavMap[fund.id] !== fund.currentNAV.nav) {
-          newNavMap[fund.id] = fund.currentNAV.nav;
-        }
-        if (!prevYieldMap[fund.id] || prevYieldMap[fund.id] !== fund.intradayYield) {
-          newYieldMap[fund.id] = fund.intradayYield;
-        }
-      });
-      
-      setPrevNavMap(newNavMap);
-      setPrevYieldMap(newYieldMap);
-    }
-  }, [data]);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      refetch();
-    }, 15000);
-    return () => clearInterval(interval);
-  }, [refetch]);
-
-  if (loading) return <div className="text-center py-4 text-sm text-gray-400 dark:text-gray-500 animate-pulse">Loading...</div>;
-
-  if (error) {
-    return (
-      <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 p-4 rounded-md mx-4 my-6">
-        <strong className="block mb-1">GraphQL Error:</strong>
-        <span>{error.message}</span>
-      </div>
-    );
-  }
-
-  return (
-    <div className="grid gap-6 px-4 sm:px-6 md:px-10 lg:px-32 max-w-5xl mx-auto">
-      {data.allFunds.map((fund) => {
-        // Use the stored previous values
-        const prevNav = prevNavMap[fund.id] || fund.currentNAV.nav;
-        const prevYield = prevYieldMap[fund.id] || fund.intradayYield;
-        
-        return (
-          <Card key={fund.id} className="rounded-2xl shadow-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-            <CardContent className="space-y-3 p-4 sm:p-6">
-              <h2 className="text-xl sm:text-2xl font-bold text-blue-600 dark:text-blue-400">{fund.name}</h2>
-              <div className="text-sm text-gray-500 dark:text-gray-400 grid grid-cols-2 gap-x-6 gap-y-1">
-                <p>Asset Type: <span className="font-medium">{fund.assetType}</span></p>
-                <p>Chain: <span className="font-medium">{fund.chainId}</span></p>
-                {fund.inceptionDate && <p>Inception: <span className="font-medium">{new Date(fund.inceptionDate).toLocaleDateString()}</span></p>}
-                <p>Fund ID: <span className="font-medium">{fund.id}</span></p>
+      {canPerformInvestorActions && (
+        <>
+          <div className="relative">
+            <Button 
+              variant="primary"
+              onClick={handleMint}
+              className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 transition-colors duration-300"
+              onMouseEnter={() => setShowMintTooltip(true)}
+              onMouseLeave={() => setShowMintTooltip(false)}
+              onFocus={() => setShowMintTooltip(true)}
+              onBlur={() => setShowMintTooltip(false)}
+              aria-label="Mint new shares"
+              title="Mint new shares into the fund"
+            >
+              + Mint Shares
+            </Button>
+            {showMintTooltip && (
+              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 -translate-y-2 bg-gray-800 text-white text-sm px-3 py-1.5 rounded shadow-lg z-10 mb-1 whitespace-nowrap">
+                <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-1/2 rotate-45 w-2 h-2 bg-gray-800"></div>
+                <p>Mint new shares based on current NAV</p>
               </div>
-              <p className="text-lg font-medium flex items-center gap-2">
-                NAV:{' '}
-                <span 
-                  className={`font-semibold transition-all duration-500 ${
-                    (fund.currentNAV?.nav ?? 0) > (prevNav ?? 0) 
-                      ? "text-green-600 dark:text-green-400" 
-                      : (fund.currentNAV?.nav ?? 0) < (prevNav ?? 0) 
-                        ? "text-red-600 dark:text-red-400" 
-                        : "text-emerald-700 dark:text-emerald-400"
-                  }`}
-                >
-                  <CountUp
-                    end={fund.currentNAV?.nav ?? 0}
-                    duration={0.75}
-                    decimals={2}
-                    prefix="$"
-                    separator=","
-                  />
-                </span>
-                <span className="transition duration-300 ease-in-out">
-                  <DeltaBadge 
-                    delta={prevNav && prevNav !== 0 
-                      ? ((fund.currentNAV?.nav - prevNav) / prevNav) * 100 
-                      : 0.01}
-                  />
-                </span>
-              </p>
-              
-              <p className="text-sm text-muted-foreground">
-                <span className="flex items-center">
-                  <Tooltip message="Total Assets Under Management (AUM) in USD.">
-                    <div className="inline-flex">
-                      <InfoIcon />
-                    </div>
-                  </Tooltip>
-                  <span className="ml-1">Total AUM:{' '}</span>
-                </span>
-                <span className="font-semibold text-black dark:text-white">
-                  {formatAUM(fund.totalAum)}
-                </span>
-              </p>
-              
-              {/* Intraday Yield Display */}
-              <div className="flex items-center">
-                <p className="text-sm text-gray-700 flex items-center flex-wrap">
-                  <span className="font-semibold">Intraday Yield: </span>
-                  <span 
-                    className={`ml-1 font-semibold transition-all duration-500 ${
-                      (fund.intradayYield ?? 0) >= 0
-                        ? "text-green-700 dark:text-green-400"
-                        : "text-red-600 dark:text-red-400"
-                    } ${
-                      (fund.intradayYield ?? 0) > (prevYield ?? 0)
-                        ? "animate-pulse"
-                        : (fund.intradayYield ?? 0) < (prevYield ?? 0)
-                          ? "animate-pulse"
-                          : ""
-                    }`}
-                  >
-                    {(fund.intradayYield ?? 0) >= 0 ? "+" : ""}
-                    <CountUp
-                      end={fund.intradayYield ?? 0}
-                      duration={0.75}
-                      suffix="%"
-                      decimals={2}
-                    />
-                    {(fund.intradayYield ?? 0) > (prevYield ?? 0)
-                      ? '↑'
-                      : (fund.intradayYield ?? 0) < (prevYield ?? 0)
-                        ? '↓'
-                        : ''}
-                  </span>
-                </p>
+            )}
+          </div>
+          
+          <div className="relative">
+            <Button 
+              variant="secondary"
+              onClick={handleRedeem}
+              className="w-full sm:w-auto bg-gray-600 hover:bg-gray-700 transition-colors duration-300 text-white"
+              onMouseEnter={() => setShowRedeemTooltip(true)}
+              onMouseLeave={() => setShowRedeemTooltip(false)}
+              onFocus={() => setShowRedeemTooltip(true)}
+              onBlur={() => setShowRedeemTooltip(false)}
+              aria-label="Redeem shares"
+              title="Redeem existing shares from the fund"
+            >
+              - Redeem Shares
+            </Button>
+            {showRedeemTooltip && (
+              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 -translate-y-2 bg-gray-800 text-white text-sm px-3 py-1.5 rounded shadow-lg z-10 mb-1 whitespace-nowrap">
+                <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-1/2 rotate-45 w-2 h-2 bg-gray-800"></div>
+                <p>Redeem your shares for underlying assets</p>
               </div>
-              
-              <p className="text-sm text-gray-400 dark:text-gray-500">
-                Updated: {timeAgo(fund.currentNAV.timestamp)}
-              </p>
-              
-              {/* Chart display */}
-              <DualChart fundId={fund.id} />
-              
-              {role === 'INVESTOR' && (
-                <>
-                  <PortfolioPanel fundId="F1" investorId="I1" />
-                </>
-              )}
-              {role === 'ADMIN' && (
-                <>
-                  <AuditLog fundId={fund.id} />
-                  <div className="mt-4">
-                    <Button
-                      variant="secondary"
-                      onClick={() => window.open('/print-report', '_blank')}
-                      className="flex items-center gap-1"
-                    >
-                      🖨️ Print Audit Report
-                    </Button>
-                  </div>
-                </>
-              )}
-            </CardContent>
-          </Card>
-        );
-      })}
+            )}
+          </div>
+          
+          <div className="relative">
+            <Button 
+              variant="primary"
+              onClick={handleWithdrawYield}
+              className="w-full sm:w-auto bg-amber-500 hover:bg-amber-600 transition-colors duration-300 text-white"
+              onMouseEnter={() => setShowWithdrawTooltip(true)}
+              onMouseLeave={() => setShowWithdrawTooltip(false)}
+              onFocus={() => setShowWithdrawTooltip(true)}
+              onBlur={() => setShowWithdrawTooltip(false)}
+              aria-label="Withdraw accrued yield"
+              title="Withdraw accrued yield from the fund"
+            >
+              Withdraw Yield
+            </Button>
+            {showWithdrawTooltip && (
+              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 -translate-y-2 bg-gray-800 text-white text-sm px-3 py-1.5 rounded shadow-lg z-10 mb-1 whitespace-nowrap">
+                <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-1/2 rotate-45 w-2 h-2 bg-gray-800"></div>
+                <p>Withdraw accrued yield from your investment</p>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {canViewAuditInfo && (
+        <div className="relative">
+          <Button 
+            variant="secondary"
+            onClick={() => window.open('/print-report', '_blank')}
+            className="w-full sm:w-auto"
+            onMouseEnter={() => setShowAuditTooltip(true)}
+            onMouseLeave={() => setShowAuditTooltip(false)}
+            onFocus={() => setShowAuditTooltip(true)}
+            onBlur={() => setShowAuditTooltip(false)}
+          >
+            🖨️ Print Audit Report
+          </Button>
+          {showAuditTooltip && (
+            <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 -translate-y-2 bg-gray-800 text-white text-sm px-3 py-1.5 rounded shadow-lg z-10 mb-1 whitespace-nowrap">
+              <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-1/2 rotate-45 w-2 h-2 bg-gray-800"></div>
+              <p>Print detailed audit report</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {!canPerformInvestorActions && !canViewAuditInfo && (
+        <div className="p-3 bg-gray-100 dark:bg-gray-700 rounded-lg text-center text-sm text-gray-600 dark:text-gray-300">
+          <p>You don't have permission to perform actions on this fund.</p>
+        </div>
+      )}
     </div>
   );
 }
 
 function AuditLog({ fundId }) {
+  const { role } = useAuth();
   const [filter, setFilter] = useState("ALL");
   const { loading, error, data } = useQuery(AUDIT_LOGS_QUERY, {
     variables: { fundId },
-    skip: !fundId,
+    skip: !fundId || role !== 'ADMIN',
     pollInterval: 30000, 
   });
+
+  // If not admin, show a message instead of the log
+  if (role !== 'ADMIN') {
+    return (
+      <Card>
+        <div className="p-4 text-center">
+          <p className="text-gray-600 dark:text-gray-400">
+            You need admin privileges to view audit logs.
+          </p>
+        </div>
+      </Card>
+    );
+  }
 
   const filteredLogs = data?.auditLogs?.filter(
     log => filter === "ALL" || log.action === filter
@@ -569,41 +614,96 @@ function AuditLog({ fundId }) {
 }
 
 export default function App() {
-  useEffect(() => {
-    // Add transition classes to body when component mounts
-    document.body.classList.add('transition-colors', 'duration-300');
-    
-    return () => {
-      // Clean up when component unmounts
-      document.body.classList.remove('transition-colors', 'duration-300');
-    };
-  }, []);
+  // Dark mode state
+  const [darkMode, setDarkMode] = useState(false);
+  const [adminView, setAdminView] = useState(false);
+  const [managerView, setManagerView] = useState(false);
+
+  const toggleDarkMode = () => setDarkMode(!darkMode);
+  const toggleAdminView = () => setAdminView(!adminView);
+  const toggleManagerView = () => setManagerView(!managerView);
   
-  // Function to toggle dark mode with smooth transition
-  const toggleDarkMode = () => {
-    document.documentElement.classList.toggle('dark');
-    localStorage.setItem('darkMode', document.documentElement.classList.contains('dark'));
-  };
-  
-  // Check for saved preference on initial load
+  // Apply dark mode
   useEffect(() => {
-    if (localStorage.getItem('darkMode') === 'true' || 
-        (!localStorage.getItem('darkMode') && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+    if (darkMode) {
       document.documentElement.classList.add('dark');
     } else {
       document.documentElement.classList.remove('dark');
     }
-  }, []);
-
+  }, [darkMode]);
+  
   return (
-    <>
-      <Toaster position="bottom-right" />
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-200 transition-colors duration-300">
-        <Header onToggleTheme={toggleDarkMode} />
-        <div className="pt-24 px-4 max-w-7xl mx-auto">
-          <FundList />
+    <PortfolioProvider>
+      <Toaster position="top-right" />
+      <div className="App">
+        <Header 
+          toggleDarkMode={toggleDarkMode} 
+          adminView={adminView}
+          toggleAdminView={toggleAdminView}
+          managerView={managerView}
+          toggleManagerView={toggleManagerView}
+        />
+        <div className="pt-20"> {/* Add padding to account for fixed header */}
+          <Routes>
+            {/* Public routes */}
+            <Route path="/" element={
+              <PublicLayout>
+                <Header 
+                  toggleDarkMode={toggleDarkMode} 
+                  adminView={adminView}
+                  toggleAdminView={toggleAdminView}
+                  managerView={managerView}
+                  toggleManagerView={toggleManagerView}
+                />
+                <div className="pt-20">
+                  <HomePage />
+                </div>
+              </PublicLayout>
+            } />
+            <Route path="/login" element={<PublicLayout><LoginPage /></PublicLayout>} />
+            <Route path="/signup" element={<PublicLayout><SignupPage /></PublicLayout>} />
+            <Route path="/about" element={<PublicLayout><AboutPage /></PublicLayout>} />
+            <Route path="/forgot-password" element={<PublicLayout><ForgotPasswordPage /></PublicLayout>} />
+
+            {/* Investor routes */}
+            <Route path="/investor/*" element={
+              <PrivateRoute allowedRoles={[ROLES.INVESTOR]}>
+                <InvestorLayout />
+              </PrivateRoute>
+            }>
+              <Route index element={<InvestorDashboard />} />
+              <Route path="portfolio" element={<div>Portfolio</div>} />
+              <Route path="transactions" element={<div>Transactions</div>} />
+              <Route path="settings" element={<div>Settings</div>} />
+            </Route>
+
+            {/* Manager routes */}
+            <Route path="/manager" element={
+              <PrivateRoute allowedRoles={[ROLES.MANAGER]}>
+                <ManagerPage />
+              </PrivateRoute>
+            } />
+
+            {/* Admin routes */}
+            <Route path="/admin/*" element={
+              <PrivateRoute allowedRoles={[ROLES.ADMIN]}>
+                <AdminLayout />
+              </PrivateRoute>
+            }>
+              <Route index element={<AdminDashboard />} />
+              <Route path="funds" element={<div>Funds Management</div>} />
+              <Route path="users" element={<div>User Management</div>} />
+              <Route path="audit" element={<div>Audit Logs</div>} />
+              <Route path="nav" element={<div>NAV Controls</div>} />
+              <Route path="yield" element={<div>Yield Controls</div>} />
+              <Route path="settings" element={<div>Settings</div>} />
+            </Route>
+
+            {/* Catch-all route */}
+            <Route path="*" element={<NotFoundPage />} />
+          </Routes>
         </div>
       </div>
-    </>
+    </PortfolioProvider>
   );
 }

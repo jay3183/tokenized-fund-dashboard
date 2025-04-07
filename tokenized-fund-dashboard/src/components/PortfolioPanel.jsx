@@ -1,214 +1,482 @@
-import React, { useContext, useState, useEffect } from 'react';
-import { useMutation, useQuery } from '@apollo/client';
-import { RoleContext } from '../context/RoleContext';
-import { GET_PORTFOLIO, MINT_SHARES, REDEEM_SHARES, WITHDRAW_YIELD } from '../graphql/queries';
-import { toast } from 'react-hot-toast';
+import React, { useState, useEffect } from 'react';
+import { useQuery, useMutation } from '@apollo/client';
+import { gql } from '@apollo/client';
+import { usePortfolio } from '../contexts/PortfolioContext';
+import MintSharesModal from './MintSharesModal';
+import RedeemDialog from './RedeemDialog';
+import { useAuth } from '../contexts/AuthContext';
+import CountUp from 'react-countup';
+import toast from 'react-hot-toast';
 
-// Portfolio Stats component for displaying key metrics
-const PortfolioStat = ({ label, value, unit, isHighlighted }) => (
-  <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 flex flex-col">
-    <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">{label}</div>
-    <div className={`text-xl font-bold flex items-center ${isHighlighted ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-900 dark:text-gray-100'}`}>
-      {value}
-      {unit && <span className="ml-1 text-sm font-medium text-gray-500 dark:text-gray-400">{unit}</span>}
+// Demo data that will definitely render
+const DEMO_PORTFOLIO = { 
+  shares: 25,
+  fund: { name: "Demo Growth Fund", currentNav: 190.75 }
+};
+
+// Query to fetch portfolio data
+const PORTFOLIO_QUERY = gql`
+  query GetPortfolio($investorId: ID!, $fundId: ID!) {
+    portfolio(investorId: $investorId, fundId: $fundId) {
+      id
+      shares
+      investorId
+      fundId
+      accruedYield
+    }
+    fund(id: $fundId) {
+      id
+      name
+      currentNav
+      previousNav
+      intradayYield
+      totalAum
+      updatedAt
+    }
+  }
+`;
+
+// Mutation to withdraw yield
+const WITHDRAW_YIELD = gql`
+  mutation WithdrawYield($input: WithdrawYieldInput!) {
+    withdrawYield(input: $input) {
+      amount
+      timestamp
+      transactionId
+    }
+  }
+`;
+
+// Tooltip component for yield calculation
+const YieldTooltip = ({ intradayYield, shares, navValue }) => {
+  const calculatedYield = (intradayYield / 100 * navValue * shares).toFixed(2);
+  
+  return (
+    <div className="absolute z-10 w-72 p-3 bg-gray-900 text-white text-sm rounded-lg shadow-lg -mt-2 right-0 transform translate-x-2">
+      <div className="font-semibold mb-1 text-yellow-300">Yield Calculation</div>
+      <div className="grid grid-cols-2 gap-1 mb-2">
+        <div>Intraday Yield:</div>
+        <div className="text-right">{intradayYield}%</div>
+        <div>NAV Value:</div>
+        <div className="text-right">${navValue.toFixed(2)}</div>
+        <div>Shares Owned:</div>
+        <div className="text-right">{shares}</div>
+      </div>
+      <div className="border-t border-gray-700 pt-2 grid grid-cols-2">
+        <div>Daily Yield:</div>
+        <div className="text-right text-green-400 font-medium">${calculatedYield}</div>
+      </div>
+      <div className="text-xs mt-2 text-gray-400">
+        Formula: (Yield Rate × NAV × Shares)
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
-export default function PortfolioPanel({ fundId, investorId }) {
-  const { role } = useContext(RoleContext);
-  const [lastWithdrawalTime, setLastWithdrawalTime] = useState(null);
-  const [isYieldWithdrawn, setIsYieldWithdrawn] = useState(false);
+console.log("[PortfolioPanel] Module loaded ✅");
+
+export default function PortfolioPanel({ 
+  fundId, 
+  investorId, 
+  onMintSuccess, 
+  onSellSuccess, 
+  onWithdrawSuccess 
+}) {
+  const { user, role } = useAuth();
+  if (!user) return null;
   
-  const { data, loading, error, refetch } = useQuery(GET_PORTFOLIO, {
-    variables: { investorId, fundId },
-    fetchPolicy: 'cache-and-network',
-    pollInterval: 15000 // Match server update interval
+  const [actionLoading, setActionLoading] = useState(false);
+  const [mintAmount, setMintAmount] = useState('');
+  const [sellAmount, setSellAmount] = useState('');
+  const [showMintModal, setShowMintModal] = useState(false);
+  const [showSellModal, setShowSellModal] = useState(false);
+  const [modalError, setModalError] = useState('');
+  const [withdrawing, setWithdrawing] = useState(false);
+  const [showYieldTooltip, setShowYieldTooltip] = useState(false);
+  
+  // Make sure we have values to query with
+  const effectiveFundId = fundId || "F1";
+  const effectiveInvestorId = investorId || user?.id || "I1";
+  
+  // Use the Apollo Client to fetch portfolio data with polling for updates
+  const { loading, error, data, refetch } = useQuery(PORTFOLIO_QUERY, {
+    variables: { 
+      investorId: effectiveInvestorId, 
+      fundId: effectiveFundId 
+    },
+    pollInterval: 30000, // Poll every 30 seconds
+    fetchPolicy: 'network-only',
+    notifyOnNetworkStatusChange: true
   });
-
-  const portfolio = data?.portfolio;
-  const shares = portfolio?.shares?.toFixed(2) || '0.00';
-  const nav = data?.fund?.currentNav || 100;
-  const yieldRate = data?.fund?.intradayYield || 0;
   
-  // Calculate accrued yield - adjust if recent withdrawal
-  const calculateAccruedYield = () => {
-    if (isYieldWithdrawn && lastWithdrawalTime) {
-      const timeSinceWithdrawal = (new Date() - new Date(lastWithdrawalTime)) / (1000 * 60 * 60 * 24);
-      // Only show yield that has accrued since last withdrawal
-      return parseFloat((shares * nav * (yieldRate / 100) * timeSinceWithdrawal).toFixed(2));
+  // Use the portfolio context
+  const { 
+    mintShares, 
+    redeemShares, 
+    withdrawYield, 
+    isLoading: portfolioActionLoading,
+    error: portfolioError,
+    clearError
+  } = usePortfolio();
+  
+  // Use the mutation to withdraw yield
+  const [withdrawYieldMutation] = useMutation(WITHDRAW_YIELD, {
+    onCompleted: (data) => {
+      if (data?.withdrawYield) {
+        toast.success(`$${data.withdrawYield.amount.toFixed(2)} yield withdrawn successfully! 💸`);
+        
+        // Log the transaction in the audit log
+        toast.success('Transaction recorded in audit log', { duration: 3000, icon: '📝' });
+        
+        if (onWithdrawSuccess) onWithdrawSuccess(data.withdrawYield);
+        refetch(); // Refresh portfolio data
+      }
+    },
+    onError: (error) => {
+      toast.error(`Failed to withdraw yield: ${error.message}`);
     }
-    return parseFloat((shares * nav * (yieldRate / 100) / 365).toFixed(2));
-  };
+  });
   
-  const accrued = calculateAccruedYield();
-
-  // Reset withdrawal state when NAV or yield rate updates
+  // Reset modal error when changing modal visibility
   useEffect(() => {
-    // If more than 1 hour has passed since last withdrawal, reset the state
-    if (lastWithdrawalTime) {
-      const hoursSinceWithdrawal = (new Date() - new Date(lastWithdrawalTime)) / (1000 * 60 * 60);
-      if (hoursSinceWithdrawal > 1) {
-        setIsYieldWithdrawn(false);
-      }
+    if (!showMintModal && !showSellModal) {
+      setModalError('');
+      clearError();
     }
-  }, [nav, yieldRate, lastWithdrawalTime]);
-
-  const [mint, { loading: mintLoading }] = useMutation(MINT_SHARES);
-  const [redeem, { loading: redeemLoading }] = useMutation(REDEEM_SHARES);
-  const [withdraw, { loading: withdrawLoading }] = useMutation(WITHDRAW_YIELD);
-
-  const handleMint = async () => {
-    const amountUsd = 100; // static demo amount
-    console.log('Minting shares:', { investorId, fundId, amountUsd });
+  }, [showMintModal, showSellModal, clearError]);
+  
+  const handleMintShares = async () => {
+    if (!mintAmount || parseFloat(mintAmount) <= 0) {
+      setModalError('Please enter a valid amount to mint.');
+      return;
+    }
     
-    try {
-      const { data: result } = await mint({ 
-        variables: { 
-          input: { investorId, fundId, amountUsd } 
-        }
-      });
-      
-      console.log('Mint result:', result);
-      
-      if (result?.mintShares?.sharesMinted) {
-        toast.success(`Minted $${amountUsd} at NAV $${nav}`);
-        refetch();
-      } else {
-        toast.error('Mint failed: No shares were minted');
+    setActionLoading(true);
+    setModalError('');
+    
+    const result = await mintShares(
+      effectiveFundId, 
+      parseFloat(mintAmount), 
+      (data) => {
+        // Success callback
+        setShowMintModal(false);
+        setMintAmount('');
+        if (onMintSuccess) onMintSuccess(data.sharesMinted);
+        refetch(); // Refresh data
+        
+        // Show toast notification
+        toast.success(`${data.sharesMinted} shares minted successfully!`, {
+          icon: '🚀',
+          duration: 4000
+        });
       }
-    } catch (err) {
-      console.error('Mint error:', err);
-      toast.error(`Mint failed: ${err.message}`);
+    );
+    
+    if (result?.error) {
+      setModalError(result.error.message);
     }
+    
+    setActionLoading(false);
   };
-
-  const handleRedeem = async () => {
-    const redeemShares = 1;
-    console.log('Redeeming shares:', { investorId, fundId, shares: redeemShares });
+  
+  const handleSellShares = async () => {
+    if (!sellAmount || parseFloat(sellAmount) <= 0) {
+      setModalError('Please enter a valid amount to sell.');
+      return;
+    }
     
+    if (data?.portfolio && parseFloat(sellAmount) > data.portfolio.shares) {
+      setModalError('You cannot sell more shares than you own.');
+      return;
+    }
+    
+    setActionLoading(true);
+    setModalError('');
+    
+    const result = await redeemShares(
+      effectiveFundId,
+      parseFloat(sellAmount),
+      (data) => {
+        // Success callback
+        setShowSellModal(false);
+        setSellAmount('');
+        if (onSellSuccess) onSellSuccess(data.sharesRedeemed);
+        refetch(); // Refresh data
+        
+        // Show toast notification
+        toast.success(`${data.sharesRedeemed} shares redeemed for $${data.amountUsd.toFixed(2)}!`, {
+          icon: '💰',
+          duration: 4000
+        });
+      }
+    );
+    
+    if (result?.error) {
+      setModalError(result.error.message);
+    }
+    
+    setActionLoading(false);
+  };
+  
+  const handleWithdrawYield = async () => {
+    if (!data?.portfolio?.accruedYield || data.portfolio.accruedYield === 0) {
+      toast.error('No yield available to withdraw');
+      return;
+    }
+    
+    setWithdrawing(true);
     try {
-      const { data: result } = await redeem({ 
+      await withdrawYieldMutation({ 
         variables: { 
-          input: { investorId, fundId, shares: redeemShares } 
+          input: {
+            investorId: effectiveInvestorId,
+            fundId: effectiveFundId
+          } 
         } 
       });
-      
-      console.log('Redeem result:', result);
-      
-      if (result?.redeemShares?.amountUSD > 0) {
-        toast.success(`Redeemed 1.00 share at NAV $${nav}`);
-        refetch();
-      } else {
-        toast.error('Redeem failed: No amount was returned');
-      }
-    } catch (err) {
-      console.error('Redeem error:', err);
-      toast.error(`Redeem failed: ${err.message}`);
+      // Success handling moved to onCompleted callback
+    } catch (error) {
+      // Error handling moved to onError callback
+      console.error("Error withdrawing yield:", error);
+    } finally {
+      setWithdrawing(false);
     }
   };
-
-  const handleWithdraw = async () => {
-    console.log('Withdrawing yield:', { investorId, fundId });
-    
-    try {
-      const { data: result } = await withdraw({ 
-        variables: { investorId, fundId } 
-      });
-      
-      console.log('Withdraw result:', result);
-      
-      const amount = result?.withdrawYield?.amount;
-      const timestamp = result?.withdrawYield?.timestamp;
-      
-      if (amount && amount > 0) {
-        toast.success(`Withdrawn $${amount.toFixed(2)} yield`);
-        setLastWithdrawalTime(timestamp);
-        setIsYieldWithdrawn(true);
-        await refetch(); // Force refetch to ensure we have latest data
-      } else {
-        toast.error('No yield available to withdraw');
-      }
-    } catch (err) {
-      console.error('Withdraw error:', err);
-      toast.error(`Withdraw failed: ${err.message}`);
-    }
+  
+  // Extract portfolio and fund data
+  const portfolio = data?.portfolio;
+  const fund = data?.fund;
+  
+  // Calculate portfolio value
+  const portfolioValue = portfolio && fund 
+    ? portfolio.shares * fund.currentNav 
+    : 0;
+  
+  // Calculate daily yield
+  const dailyYield = portfolio && fund && fund.intradayYield
+    ? (fund.intradayYield / 100) * portfolioValue
+    : 0;
+  
+  // Format large numbers
+  const formatLargeNumber = (num) => {
+    if (num >= 1000000) return `${(num / 1000000).toFixed(2)}M`;
+    if (num >= 1000) return `${(num / 1000).toFixed(2)}K`;
+    return num.toFixed(2);
   };
-
-  if (loading) return (
-    <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow dark:shadow-gray-700 max-w-2xl mx-auto mt-8">
-      <p className="text-center text-gray-500 dark:text-gray-400">Loading portfolio data...</p>
-    </div>
-  );
-
-  if (error) return (
-    <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow dark:shadow-gray-700 max-w-2xl mx-auto mt-8">
-      <p className="text-center text-red-500 dark:text-red-400">Error: {error.message}</p>
-    </div>
-  );
-
+  
+  // Display loading state
+  if (loading && !data) {
+    return (
+      <div className="p-6 bg-white dark:bg-slate-800 rounded-lg shadow-md animate-pulse">
+        <div className="h-6 bg-slate-200 dark:bg-slate-700 rounded w-3/4 mb-4"></div>
+        <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-1/2 mb-6"></div>
+        <div className="grid grid-cols-2 gap-4 mb-6">
+          <div className="h-12 bg-slate-200 dark:bg-slate-700 rounded"></div>
+          <div className="h-12 bg-slate-200 dark:bg-slate-700 rounded"></div>
+        </div>
+        <div className="h-24 bg-slate-200 dark:bg-slate-700 rounded mb-6"></div>
+        <div className="h-10 bg-slate-200 dark:bg-slate-700 rounded w-3/4 mx-auto"></div>
+      </div>
+    );
+  }
+  
+  // Display error state
+  if (error) {
+    return (
+      <div className="p-6 bg-red-50 dark:bg-red-900/20 text-red-900 dark:text-red-200 rounded-lg border border-red-200 dark:border-red-800 shadow-md">
+        <h2 className="text-xl font-bold mb-2">Portfolio Error</h2>
+        <p>Unable to load portfolio data. Please try again later.</p>
+        <p className="mt-2 text-sm">{error.message}</p>
+        <button
+          onClick={() => refetch()}
+          className="mt-4 px-4 py-2 bg-red-200 dark:bg-red-800 text-red-900 dark:text-red-100 rounded-lg hover:bg-red-300 dark:hover:bg-red-700 transition-colors"
+        >
+          Try Again
+        </button>
+      </div>
+    );
+  }
+  
+  // If no portfolio or fund data is available
+  if (!data?.portfolio || !data?.fund) {
+    return (
+      <div className="p-6 bg-yellow-50 dark:bg-yellow-900/20 text-yellow-900 dark:text-yellow-200 rounded-lg border border-yellow-200 dark:border-yellow-800 shadow-md">
+        <h2 className="text-xl font-bold mb-2">Portfolio Unavailable</h2>
+        <p>Unable to load portfolio data for investor {effectiveInvestorId}.</p>
+        <button
+          onClick={() => refetch()}
+          className="mt-4 px-4 py-2 bg-yellow-200 dark:bg-yellow-800 text-yellow-900 dark:text-yellow-100 rounded-lg hover:bg-yellow-300 dark:hover:bg-yellow-700 transition-colors"
+        >
+          Try Again
+        </button>
+      </div>
+    );
+  }
+  
+  // Render portfolio panel when we have data
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow dark:shadow-gray-700 max-w-2xl mx-auto mt-8">
-      <div className="flex justify-between mb-4">
-        <h2 className="text-xl font-bold text-gray-800 dark:text-gray-200">Your Portfolio</h2>
-        <span className="text-xs font-medium text-indigo-600 dark:text-indigo-400 bg-indigo-100 dark:bg-indigo-900 px-2 py-1 rounded-full">{role}</span>
-      </div>
-
-      <div className="bg-indigo-50 dark:bg-indigo-900/30 rounded-xl p-4 flex items-center gap-4">
-        <div className="text-indigo-600 dark:text-indigo-400">
-          <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 20 20"><path d="M10 18a8 8 0 100-16 8 8 0 000 16zm-.75-11a.75.75 0 01.75-.75h.5a.75.75 0 010 1.5h-.5v1h.25a.75.75 0 010 1.5h-.25v.75a.75.75 0 01-1.5 0v-.75h-.25a.75.75 0 010-1.5h.25v-1h-.5a.75.75 0 010-1.5h.5z"/></svg>
-        </div>
-        <div>
-          <p className="text-sm text-indigo-700 dark:text-indigo-300 font-medium">Total Shares</p>
-          <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{shares}</p>
-        </div>
-      </div>
-
-      <div className="mt-4 grid grid-cols-2 gap-4">
-        <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-xl">
-          <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Portfolio Value</p>
-          <p className="text-xl font-semibold text-gray-800 dark:text-gray-100">${(shares * nav).toFixed(2)}</p>
-        </div>
-        <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-xl">
-          <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
-            Accrued Yield
-            {isYieldWithdrawn && (
-              <span className="ml-1 text-xs text-green-600 dark:text-green-400">(Since last withdrawal)</span>
-            )}
+    <div className="p-6 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700">
+      <h2 className="text-xl font-semibold text-slate-900 dark:text-white mb-1">{fund.name} Portfolio</h2>
+      <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
+        Portfolio ID: {portfolio.id} • NAV: ${fund.currentNav.toFixed(2)}
+      </p>
+      
+      <div className="grid grid-cols-2 gap-4 mb-6">
+        <div className="p-4 bg-slate-50 dark:bg-slate-700 rounded-lg">
+          <p className="text-sm text-slate-500 dark:text-slate-400">Shares Owned</p>
+          <p className="text-2xl font-bold text-slate-900 dark:text-white">
+            <CountUp 
+              end={portfolio.shares} 
+              decimals={2} 
+              duration={1} 
+              separator="," 
+            />
           </p>
-          <p className="text-xl font-semibold text-green-600 dark:text-green-400">${accrued > 0 ? accrued.toFixed(2) : '0.00'}</p>
+        </div>
+        <div className="p-4 bg-slate-50 dark:bg-slate-700 rounded-lg">
+          <p className="text-sm text-slate-500 dark:text-slate-400">Portfolio Value</p>
+          <p className="text-2xl font-bold text-slate-900 dark:text-white">
+            ${' '}
+            <CountUp 
+              end={portfolioValue} 
+              decimals={2}
+              duration={1} 
+              separator="," 
+            />
+          </p>
         </div>
       </div>
-
-      {lastWithdrawalTime && (
-        <div className="mt-3 text-xs text-gray-500 dark:text-gray-400 text-center">
-          Last yield withdrawal: {new Date(lastWithdrawalTime).toLocaleString()}
+      
+      <div className="p-4 mb-6 bg-gradient-to-br from-blue-50 to-slate-50 dark:from-blue-900/20 dark:to-slate-700 rounded-lg border border-blue-100 dark:border-blue-800 relative">
+        <div className="flex justify-between items-center">
+          <div>
+            <p className="text-sm text-slate-600 dark:text-slate-300 flex items-center">
+              Daily Yield
+              <button 
+                className="ml-2 text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                onClick={() => setShowYieldTooltip(!showYieldTooltip)}
+                onMouseEnter={() => setShowYieldTooltip(true)}
+                onMouseLeave={() => setShowYieldTooltip(false)}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                </svg>
+              </button>
+              {showYieldTooltip && (
+                <YieldTooltip 
+                  intradayYield={fund.intradayYield} 
+                  shares={portfolio.shares} 
+                  navValue={fund.currentNav} 
+                />
+              )}
+            </p>
+            <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+              ${' '}
+              <CountUp 
+                end={dailyYield} 
+                decimals={2} 
+                duration={1} 
+                separator="," 
+              />
+            </p>
+          </div>
+          <button
+            onClick={handleWithdrawYield}
+            disabled={!portfolio.accruedYield || portfolio.accruedYield === 0 || withdrawing}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+              !portfolio.accruedYield || portfolio.accruedYield === 0 || withdrawing
+                ? 'bg-gray-300 text-gray-600 dark:bg-gray-700 dark:text-gray-400 cursor-not-allowed'
+                : 'bg-green-600 text-white hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600 shadow-md hover:shadow-lg transform hover:-translate-y-0.5'
+            }`}
+          >
+            {withdrawing ? (
+              <span className="flex items-center">
+                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Processing...
+              </span>
+            ) : (
+              'Withdraw Yield'
+            )}
+          </button>
         </div>
+        
+        <div className="mt-3 flex items-center">
+          <div className="flex-1">
+            <p className="text-xs text-slate-500 dark:text-slate-400">Current Rate</p>
+            <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
+              {fund.intradayYield}% <span className="text-xs text-slate-500 dark:text-slate-400">per day</span>
+            </p>
+          </div>
+          <div className="flex-1">
+            <p className="text-xs text-slate-500 dark:text-slate-400">Accrued Yield</p>
+            <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
+              ${portfolio.accruedYield ? portfolio.accruedYield.toFixed(2) : '0.00'}
+            </p>
+          </div>
+          <div className="flex-1">
+            <p className="text-xs text-slate-500 dark:text-slate-400">Last Updated</p>
+            <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
+              {new Date(fund.updatedAt).toLocaleTimeString()}
+            </p>
+          </div>
+        </div>
+      </div>
+      
+      <div className="flex gap-4 justify-center">
+        <button
+          onClick={() => setShowMintModal(true)}
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+        >
+          Buy Shares
+        </button>
+        <button
+          onClick={() => setShowSellModal(true)}
+          disabled={!portfolio.shares || portfolio.shares === 0}
+          className={`px-4 py-2 rounded-lg transition-colors ${
+            !portfolio.shares || portfolio.shares === 0
+              ? 'bg-gray-300 text-gray-600 cursor-not-allowed'
+              : 'bg-amber-600 text-white hover:bg-amber-700'
+          }`}
+        >
+          Sell Shares
+        </button>
+      </div>
+      
+      {/* Mint Shares Modal */}
+      {showMintModal && (
+        <MintSharesModal
+          isOpen={showMintModal}
+          onClose={() => setShowMintModal(false)}
+          fundId={effectiveFundId}
+          navPrice={fund.currentNav}
+          fundName={fund.name}
+          onMint={handleMintShares}
+          amount={mintAmount}
+          setAmount={setMintAmount}
+          error={modalError}
+          loading={actionLoading || portfolioActionLoading}
+        />
       )}
-
-      <div className="flex justify-center gap-4 mt-6">
-        <button 
-          onClick={handleMint} 
-          disabled={mintLoading}
-          className={`${mintLoading ? 'bg-blue-400 dark:bg-blue-500' : 'bg-blue-600 dark:bg-blue-500 hover:bg-blue-700 dark:hover:bg-blue-600'} text-white px-6 py-2 rounded-lg`}
-        >
-          {mintLoading ? 'Minting...' : '+ Mint Shares'}
-        </button>
-        <button 
-          onClick={handleRedeem} 
-          disabled={redeemLoading || parseFloat(shares) < 1}
-          className={`${redeemLoading ? 'bg-gray-400 dark:bg-gray-500' : parseFloat(shares) < 1 ? 'bg-gray-400 dark:bg-gray-600 cursor-not-allowed' : 'bg-gray-700 dark:bg-gray-600 hover:bg-gray-800 dark:hover:bg-gray-700'} text-white px-6 py-2 rounded-lg`}
-        >
-          {redeemLoading ? 'Redeeming...' : '− Redeem Shares'}
-        </button>
-        <button 
-          onClick={handleWithdraw} 
-          disabled={withdrawLoading || accrued <= 0}
-          className={`${withdrawLoading ? 'bg-green-400 dark:bg-green-500' : accrued <= 0 ? 'bg-green-400 dark:bg-green-500 cursor-not-allowed' : 'bg-green-600 dark:bg-green-500 hover:bg-green-700 dark:hover:bg-green-600'} text-white px-6 py-2 rounded-lg`}
-        >
-          {withdrawLoading ? 'Withdrawing...' : isYieldWithdrawn && accrued <= 0.1 ? 'Yield Withdrawn' : 'Withdraw Yield'}
-        </button>
-      </div>
+      
+      {/* Redeem Shares Modal */}
+      {showSellModal && (
+        <RedeemDialog
+          isOpen={showSellModal}
+          onClose={() => setShowSellModal(false)}
+          fundId={effectiveFundId}
+          navPrice={fund.currentNav}
+          fundName={fund.name}
+          maxShares={portfolio.shares}
+          onRedeem={handleSellShares}
+          amount={sellAmount}
+          setAmount={setSellAmount}
+          error={modalError}
+          loading={actionLoading || portfolioActionLoading}
+        />
+      )}
     </div>
   );
-} 
+}

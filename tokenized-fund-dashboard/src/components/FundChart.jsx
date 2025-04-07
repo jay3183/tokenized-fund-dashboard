@@ -1,142 +1,279 @@
-import { useMemo, useState } from "react";
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-} from "recharts";
+import React, { useState, useEffect } from 'react';
+import { useQuery } from '@apollo/client';
+import { gql } from '@apollo/client';
+import CountUp from 'react-countup';
+import { formatCurrency } from '../utils/formatNumber';
 
-export default function FundChart({ navHistory, yieldHistory }) {
-  const [selectedRange, setSelectedRange] = useState("ALL");
-  const now = Date.now();
+// GraphQL query to get NAV and yield history
+const GET_CHART_DATA = gql`
+  query GetChartData($fundId: ID!, $range: String!) {
+    chartData(fundId: $fundId, range: $range) {
+      date
+      nav
+      yield
+    }
+  }
+`;
 
-  // Merge navHistory and yieldHistory by timestamp
-  const mergedData = useMemo(() => {
-    const navMap = new Map();
-    const yieldMap = new Map();
-    
-    // Create maps for quick lookup
-    navHistory.forEach(item => {
-      navMap.set(new Date(item.timestamp).getTime(), item.nav);
-    });
-    
-    yieldHistory.forEach(item => {
-      yieldMap.set(new Date(item.timestamp).getTime(), item.yield);
-    });
-    
-    // Combine all timestamps
-    const allTimestamps = [...new Set([
-      ...navHistory.map(item => new Date(item.timestamp).getTime()),
-      ...yieldHistory.map(item => new Date(item.timestamp).getTime()),
-    ])].sort();
-    
-    // Create combined dataset
-    return allTimestamps.map(timestamp => {
-      const date = new Date(timestamp);
-      return {
-        timestamp: date.toLocaleString("en-US", {
-          hour: "numeric",
-          minute: "2-digit",
-        }),
-        rawTimestamp: timestamp,
-        nav: navMap.get(timestamp) || null,
-        yield: yieldMap.get(timestamp) || null
-      };
-    });
-  }, [navHistory, yieldHistory]);
+// Get NAV history specifically
+const NAV_HISTORY = gql`
+  query GetNAVHistory($fundId: ID!) {
+    navHistory(fundId: $fundId) {
+      id
+      timestamp
+      nav
+    }
+  }
+`;
 
-  const filteredData = useMemo(() => {
-    const cutoff = {
-      "1H": now - 3600 * 1000,
-      "6H": now - 6 * 3600 * 1000,
-      "1D": now - 24 * 3600 * 1000,
-      "ALL": 0,
-    }[selectedRange];
-    return mergedData.filter((point) => point.rawTimestamp > cutoff);
-  }, [mergedData, selectedRange]);
+// Get yield history specifically
+const YIELD_HISTORY = gql`
+  query GetYieldHistory($fundId: ID!) {
+    fund(id: $fundId) {
+      yieldHistory {
+        timestamp
+        yield
+      }
+    }
+  }
+`;
+
+const FundChart = ({ fundId, type = 'nav' }) => {
+  const [chartData, setChartData] = useState([]);
+  const [timeRange, setTimeRange] = useState('ALL');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [previousValue, setPreviousValue] = useState(null);
+  const [lastUpdated, setLastUpdated] = useState(Date.now());
+  
+  // Query for the appropriate history data based on type
+  const { loading: queryLoading, error: queryError, data, refetch } = useQuery(
+    type === 'nav' ? NAV_HISTORY : YIELD_HISTORY,
+    {
+      variables: { fundId },
+      pollInterval: 30000, // Poll every 30 seconds
+      notifyOnNetworkStatusChange: true,
+    }
+  );
+  
+  // Process data when it changes
+  useEffect(() => {
+    if (data) {
+      setLoading(false);
+      
+      try {
+        let processedData = [];
+        
+        if (type === 'nav' && data.navHistory) {
+          processedData = data.navHistory.map(item => ({
+            date: new Date(item.timestamp),
+            value: parseFloat(item.nav)
+          }));
+        } else if (type === 'yield' && data.fund?.yieldHistory) {
+          processedData = data.fund.yieldHistory.map(item => ({
+            date: new Date(item.timestamp),
+            value: parseFloat(item.yield)
+          }));
+        }
+        
+        // Sort by date
+        processedData.sort((a, b) => a.date - b.date);
+        
+        // Filter data based on time range
+        const filteredData = filterDataByTimeRange(processedData, timeRange);
+        
+        // Check if value has changed for animation
+        const latestValue = filteredData.length > 0 ? filteredData[filteredData.length - 1].value : 0;
+        
+        if (previousValue !== null && latestValue !== previousValue) {
+          setLastUpdated(Date.now());
+        }
+        
+        setPreviousValue(latestValue);
+        setChartData(filteredData);
+        
+      } catch (err) {
+        console.error('Error processing chart data:', err);
+        setError('Failed to process chart data');
+      }
+    }
+  }, [data, timeRange, type, previousValue]);
+  
+  // Filter data based on time range
+  const filterDataByTimeRange = (data, range) => {
+    if (!data || data.length === 0) return [];
+    
+    const now = new Date();
+    let cutoffDate;
+    
+    switch (range) {
+      case '1H':
+        cutoffDate = new Date(now.getTime() - 60 * 60 * 1000);
+        break;
+      case '1D':
+        cutoffDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        break;
+      case '1W':
+        cutoffDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        break;
+      case 'ALL':
+      default:
+        return data;
+    }
+    
+    return data.filter(item => item.date >= cutoffDate);
+  };
+  
+  // Timer to update the "last updated" text
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setLastUpdated(prev => {
+        // Only trigger re-render if we need to update the text
+        const secondsAgo = Math.floor((Date.now() - prev) / 1000);
+        if (secondsAgo % 5 === 0) return prev;
+        return prev;
+      });
+    }, 1000);
+    
+    return () => clearInterval(timer);
+  }, []);
+  
+  // Calculate seconds since last update
+  const secondsAgo = Math.floor((Date.now() - lastUpdated) / 1000);
+  
+  // Calculate stats
+  const latestValue = chartData.length > 0 ? chartData[chartData.length - 1].value : 0;
+  const oldestValue = chartData.length > 0 ? chartData[0].value : 0;
+  const changeValue = latestValue - oldestValue;
+  const changePercent = oldestValue ? (changeValue / oldestValue) * 100 : 0;
+  const isPositive = changeValue >= 0;
+  
+  if (loading || queryLoading) {
+    return (
+      <div className="h-64 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+  
+  if (error || queryError) {
+    return (
+      <div className="h-64 flex items-center justify-center text-red-500">
+        <p>Error loading chart data</p>
+      </div>
+    );
+  }
+  
+  // Get min and max for scaling
+  const values = chartData.map(d => d.value);
+  const min = values.length > 0 ? Math.min(...values) * 0.99 : 0; // Add padding
+  const max = values.length > 0 ? Math.max(...values) * 1.01 : 100;
+  const range = max - min;
   
   return (
-    <div className="h-[300px] p-4">
-      <div className="flex space-x-2 justify-end mb-2">
-        {["1H", "6H", "1D", "ALL"].map((range) => (
-          <button
-            key={range}
-            className={`text-xs px-2 py-1 rounded ${selectedRange === range ? "bg-blue-600 text-white" : "bg-gray-200"}`}
-            onClick={() => setSelectedRange(range)}
-          >
-            {range}
-          </button>
-        ))}
+    <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow">
+      <div className="flex justify-between items-center mb-4">
+        <h3 className="font-semibold text-slate-800 dark:text-white">
+          {type === 'nav' ? 'NAV History' : 'Yield History'}
+        </h3>
+        <div className="text-xs text-slate-500 dark:text-slate-400">
+          Last updated {secondsAgo} seconds ago
+        </div>
       </div>
-      <ResponsiveContainer width="100%" height="100%">
-        <LineChart
-          data={filteredData}
-          margin={{
-            top: 20,
-            right: 40,
-            left: 40,
-            bottom: 20,
-          }}
+      
+      <div className="flex justify-between items-center mb-4">
+        <div className="flex space-x-2">
+          {['1H', '1D', '1W', 'ALL'].map(range => (
+            <button
+              key={range}
+              onClick={() => setTimeRange(range)}
+              className={`px-3 py-1 text-xs rounded-md ${
+                timeRange === range
+                  ? 'bg-primary text-white'
+                  : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
+              }`}
+            >
+              {range}
+            </button>
+          ))}
+        </div>
+        <button
+          onClick={() => refetch()}
+          className="text-xs text-primary dark:text-blue-400 hover:underline"
         >
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis 
-            dataKey="timestamp" 
-            tickFormatter={(timestamp) =>
-              new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-            }
-            interval="preserveStartEnd"
-            minTickGap={30}
-            padding={{ left: 25, right: 25 }}
-            tick={{ fill: '#6b7280', fontSize: 12 }}
+          Refresh
+        </button>
+      </div>
+      
+      <div className="flex justify-between items-center mb-2">
+        <div>
+          <span className="text-xs text-slate-500 dark:text-slate-400">
+            Starting: {type === 'nav' ? '$' : ''}{oldestValue.toFixed(2)}{type === 'yield' ? '%' : ''}
+          </span>
+        </div>
+        <div className="text-right">
+          <span className={`text-xs font-medium ${isPositive ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+            {isPositive ? '+' : ''}{changePercent.toFixed(2)}% ({isPositive ? '+' : ''}
+            {type === 'nav' ? '$' : ''}{changeValue.toFixed(2)}{type === 'yield' ? '%' : ''})
+          </span>
+        </div>
+      </div>
+      
+      <div className="relative h-40">
+        {/* Chart background */}
+        <div className="absolute inset-0 bg-slate-50 dark:bg-slate-700/50 rounded overflow-hidden">
+          <div className="h-full flex items-end">
+            {chartData.map((point, index) => {
+              const height = ((point.value - min) / range) * 100;
+              return (
+                <div
+                  key={index}
+                  className="flex-1 flex justify-center items-end h-full"
+                >
+                  <div
+                    className={`w-full max-w-[8px] rounded-t ${
+                      point.value > oldestValue
+                        ? type === 'nav' ? 'bg-primary dark:bg-blue-400' : 'bg-amber-500 dark:bg-amber-400'
+                        : 'bg-red-500 dark:bg-red-400'
+                    }`}
+                    style={{ height: `${height}%`, minHeight: '1px' }}
+                    title={`${point.date.toLocaleDateString()}: ${type === 'nav' ? '$' : ''}${point.value.toFixed(2)}${type === 'yield' ? '%' : ''}`}
+                  ></div>
+                </div>
+              );
+            })}
+          </div>
+          
+          {/* Value line */}
+          <div 
+            className="absolute left-0 right-0 border-t border-dashed border-slate-300 dark:border-slate-600"
+            style={{ top: `${((max - oldestValue) / range) * 100}%` }}
+          >
+            <span className="absolute right-0 -top-3 text-xs text-slate-500 dark:text-slate-400 px-1">
+              Start: {type === 'nav' ? '$' : ''}{oldestValue.toFixed(2)}{type === 'yield' ? '%' : ''}
+            </span>
+          </div>
+        </div>
+      </div>
+      
+      <div className="mt-4 text-center">
+        <div className="text-2xl font-bold text-slate-900 dark:text-white">
+          {type === 'nav' ? '$' : ''}
+          <CountUp 
+            end={latestValue} 
+            decimals={2} 
+            duration={1} 
+            preserveValue={true}
+            separator=","
           />
-          <YAxis 
-            yAxisId="left"
-            domain={['dataMin', 'dataMax']}
-            tickFormatter={(value) => `$${parseFloat(value).toFixed(2)}`}
-            tick={{ fill: '#6b7280', fontSize: 12 }}
-            tickMargin={12}
-          />
-          <YAxis 
-            yAxisId="right" 
-            orientation="right"
-            domain={['auto', 'auto']}
-            tickFormatter={(value) => `${parseFloat(value).toFixed(2)}%`}
-          />
-          <Tooltip
-            formatter={(value, name) => {
-              if (name === "NAV") return [`$${value.toFixed(2)}`, "NAV"];
-              if (name === "Yield") return [`${value.toFixed(2)}%`, "Yield"];
-              return [value, name];
-            }}
-            labelFormatter={(label) => label}
-          />
-          <Legend />
-          <Line
-            type="monotone"
-            dataKey="nav"
-            stroke="#2563eb"
-            strokeWidth={2}
-            dot={false}
-            name="NAV"
-            yAxisId="left"
-            connectNulls={true}
-          />
-          <Line
-            type="monotone"
-            dataKey="yield"
-            stroke="#10b981"
-            strokeWidth={2}
-            dot={false}
-            name="Yield"
-            yAxisId="right"
-            connectNulls={true}
-          />
-        </LineChart>
-      </ResponsiveContainer>
+          {type === 'yield' ? '%' : ''}
+        </div>
+        <div className="text-xs text-slate-500 dark:text-slate-400">
+          Current {type === 'nav' ? 'NAV' : 'Yield'}
+        </div>
+      </div>
     </div>
   );
-} 
+};
+
+export default FundChart; 

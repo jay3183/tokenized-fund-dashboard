@@ -12,6 +12,9 @@ datasource db {
 model User {
   id       String    @id @default(cuid())
   name     String
+  email    String    @unique
+  password String
+  role     String    @default("INVESTOR") // INVESTOR, ADMIN, MANAGER
   holdings Holding[]
 }
 
@@ -21,11 +24,13 @@ model Fund {
   chainId       String
   assetType     String
   currentNav    Float
+  previousNav   Float          @default(100.0)
   intradayYield Float
   totalAum      Float
   inceptionDate DateTime?
   navHistory    NAVSnapshot[]
   yieldHistory  YieldHistory[]
+  yieldSnapshots YieldSnapshot[]
   auditLogs     AuditLog[]
   portfolios    Portfolio[]
   holdings      Holding[]
@@ -38,14 +43,20 @@ model Holding {
   userId String
   fund   Fund   @relation(fields: [fundId], references: [id])
   user   User   @relation(fields: [userId], references: [id])
+  
+  @@unique([userId, fundId])
 }
 
 model Portfolio {
-  id         String @id @default(cuid())
-  investorId String
-  fundId     String
-  shares     Float
-  fund       Fund   @relation(fields: [fundId], references: [id])
+  id                  String    @id @default(cuid())
+  investorId          String
+  fundId              String
+  shares              Float
+  lastYieldWithdrawal DateTime?
+  accruedYield        Float     @default(0)
+  fund                Fund      @relation(fields: [fundId], references: [id])
+  
+  @@unique([investorId, fundId])
 }
 
 model NAVSnapshot {
@@ -62,6 +73,15 @@ model YieldHistory {
   fundId    String
   yield     Float
   timestamp DateTime
+  fund      Fund     @relation(fields: [fundId], references: [id])
+}
+
+model YieldSnapshot {
+  id        String   @id @default(cuid())
+  fundId    String
+  yield     Float
+  timestamp DateTime
+  source    String   @default("system")
   fund      Fund     @relation(fields: [fundId], references: [id])
 }
 

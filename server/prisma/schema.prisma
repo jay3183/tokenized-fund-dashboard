@@ -1,0 +1,97 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id       String    @id @default(cuid())
+  name     String
+  email    String    @unique
+  password String
+  role     String    @default("INVESTOR") // INVESTOR, ADMIN, MANAGER
+  holdings Holding[]
+}
+
+model Fund {
+  id            String         @id @default(cuid())
+  name          String
+  chainId       String
+  assetType     String
+  currentNav    Float
+  previousNav   Float          @default(100.0)
+  intradayYield Float
+  totalAum      Float
+  inceptionDate DateTime?
+  navHistory    NAVSnapshot[]
+  yieldHistory  YieldHistory[]
+  yieldSnapshots YieldSnapshot[]
+  auditLogs     AuditLog[]
+  portfolios    Portfolio[]
+  holdings      Holding[]
+}
+
+model Holding {
+  id     String @id @default(cuid())
+  units  Float
+  fundId String
+  userId String
+  fund   Fund   @relation(fields: [fundId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+  
+  @@unique([userId, fundId])
+}
+
+model Portfolio {
+  id                    String   @id @default(cuid())
+  investorId            String
+  fundId                String
+  shares                Float
+  accruedYield          Float     @default(0)
+  lastYieldWithdrawal   DateTime?
+  fund                  Fund     @relation(fields: [fundId], references: [id])
+  
+  @@unique([investorId, fundId])
+}
+
+model NAVSnapshot {
+  id        String   @id @default(cuid())
+  fundId    String
+  nav       Float
+  timestamp DateTime
+  source    String
+  fund      Fund     @relation(fields: [fundId], references: [id])
+}
+
+model YieldHistory {
+  id        String   @id @default(cuid())
+  fundId    String
+  yield     Float
+  timestamp DateTime
+  fund      Fund     @relation(fields: [fundId], references: [id])
+}
+
+model YieldSnapshot {
+  id        String   @id @default(cuid())
+  fundId    String
+  yield     Float
+  timestamp DateTime
+  source    String   @default("system")
+  fund      Fund     @relation(fields: [fundId], references: [id])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  actor     String
+  action    String
+  target    String
+  timestamp DateTime
+  metadata  Json
+  fundId    String
+  fund      Fund     @relation(fields: [fundId], references: [id])
+} 

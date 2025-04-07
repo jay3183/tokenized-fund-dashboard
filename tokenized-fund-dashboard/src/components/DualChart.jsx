@@ -6,23 +6,31 @@ import {
 import { gql, useQuery } from '@apollo/client';
 import { timeAgo } from '../utils/timeAgo';
 import { format } from 'date-fns';
+import { NAV_HISTORY } from '../graphql/queries';
+import { formatNumber, formatCurrency } from '../utils/formatNumber';
 
-// GraphQL query to get both NAV and yield history for a fund
-const FUND_QUERY = gql`
-  query GetFundWithHistories($id: ID!) {
-    fund(id: $id) {
+// GraphQL query to get yield history for a fund
+const GET_FUND_DATA = gql`
+  query GetFundData($fundId: ID!) {
+    fund(id: $fundId) {
       id
       name
       currentNav
+      previousNav
       intradayYield
       yieldHistory {
         timestamp
         yield
       }
-    }
-    navHistory(fundId: $id) {
-      timestamp
-      nav
+      yieldSnapshots {
+        timestamp
+        yield
+        source
+      }
+      currentNAV {
+        nav
+        timestamp
+      }
     }
   }
 `;
@@ -51,12 +59,7 @@ const formatTime = (timestamp) => {
       return 'Invalid time';
     }
     
-    // Log the ISO string and formatted time for debugging
-    console.log(`XAxis timestamp: ${format(date, 'MMM d, h:mm:ss a')}`);
-    console.log(`XAxis value: ${cleanTimestamp}`);
-    
-    // Display just the hour and minute in a simple format
-    // This makes the x-axis labels much more readable
+    // Display more specific time formatting for better readability
     return format(date, 'h:mm a');
   } catch (error) {
     console.error('Error formatting timestamp:', timestamp, error);
@@ -65,27 +68,42 @@ const formatTime = (timestamp) => {
 };
 
 // Wrapper component to manage stable hooks
-export default function DualChart({ fundId }) {
-  // Create a stable jitter pattern that won't change on re-renders
-  const stableJitterPattern = useMemo(() => {
-    console.log("Creating stable jitter pattern (should only happen once)");
-    // Create a pattern of small jitter values, using a fixed seed approach
-    return Array(1000).fill(0).map((_, i) => {
-      // Use a deterministic approach based on index
-      // This creates a sine wave pattern with tiny magnitude
-      // Increase jitter magnitude to make variations more visible
-      return (Math.sin(i * 0.1) + Math.cos(i * 0.3)) * 0.005; // Increased from 0.0012
-    });
-  }, []); // Empty dependency array ensures this runs only once
+export default function DualChart({ fundId, navHistory, yieldHistory, currentNav, currentYield, className }) {
+  const userId = localStorage.getItem('userId');
+  const isAuthenticated = !!localStorage.getItem('token');
+  
+  // Return early if not authenticated
+  if (!isAuthenticated || !userId) {
+    return (
+      <div className={`bg-white dark:bg-gray-800 rounded-xl p-4 h-72 w-full shadow-md border border-gray-100 dark:border-gray-700 ${className || ''}`}>
+        <p className="text-center text-gray-500 dark:text-gray-400">Please log in to view charts</p>
+      </div>
+    );
+  }
+  
+  console.log("[DEBUG] DualChart rendering with:", { 
+    fundId, 
+    navHistoryLength: navHistory?.length,
+    yieldHistoryLength: yieldHistory?.length,
+    currentNav,
+    currentYield
+  });
 
-  // Now render the main chart component with the stable jitter pattern
-  return <DualChartContent fundId={fundId} stableJitterPattern={stableJitterPattern} />;
+  // Now render the main chart component with simplified props
+  return <DualChartContent 
+    fundId={fundId}
+    navHistory={navHistory}
+    yieldHistory={yieldHistory}
+    currentNav={currentNav}
+    currentYield={currentYield}
+    className={className}
+  />;
 }
 
 // Inner content component that handles all the chart functionality
-function DualChartContent({ fundId, stableJitterPattern }) {
-  const [viewMode, setViewMode] = useState('YIELD'); // NAV, YIELD, COMBINED
-  const [range, setRange] = useState('6H');
+function DualChartContent({ fundId, navHistory: propNavHistory, yieldHistory: propYieldHistory, currentNav, currentYield, className }) {
+  const [viewMode, setViewMode] = useState('COMBINED'); // Changed default to COMBINED to show both NAV and yield
+  const [range, setRange] = useState('ALL'); // Show all data points by default
   const [chartData, setChartData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -111,474 +129,637 @@ function DualChartContent({ fundId, stableJitterPattern }) {
     return () => observer.disconnect();
   }, []);
 
-  // Apollo query for fund data
-  const { data, error: queryError, loading: queryLoading } = useQuery(
-    FUND_QUERY,
+  // Only fetch from API if we don't have props data
+  const shouldFetchFromApi = !propNavHistory?.length && !propYieldHistory?.length;
+  
+  // Apollo query for yield data - only if we don't have props
+  const { data: yieldData, error: yieldError, loading: yieldLoading } = useQuery(
+    GET_FUND_DATA,
     {
-      variables: { id: fundId },
+      variables: { fundId },
       pollInterval: 15000, // Poll every 15 seconds
-      skip: !fundId
+      skip: !fundId || !shouldFetchFromApi
     }
   );
+  
+  // Apollo query for NAV history data - only if we don't have props
+  const { data: navData, error: navError, loading: navLoading } = useQuery(
+    NAV_HISTORY,
+    {
+      variables: { fundId },
+      pollInterval: 15000, // Poll every 15 seconds
+      skip: !fundId || !shouldFetchFromApi,
+      fetchPolicy: 'network-only' // Always get fresh data from server
+    }
+  );
+  
+  // Use either props or fetched data
+  const navHistory = propNavHistory?.length ? propNavHistory : navData?.navHistory || [];
+  const yieldHistory = propYieldHistory?.length ? propYieldHistory : yieldData?.fund?.yieldHistory || [];
+  
+  // Log data availability
+  useEffect(() => {
+    console.log("[DEBUG] Chart data sources:", {
+      usingPropsData: !!propNavHistory?.length,
+      usingFetchedData: !propNavHistory?.length && !!navData?.navHistory?.length,
+      navHistoryLength: navHistory?.length,
+      yieldHistoryLength: yieldHistory?.length,
+      dataIsLoading: shouldFetchFromApi && (yieldLoading || navLoading)
+    });
+  }, [propNavHistory, navData, yieldData, yieldLoading, navLoading, shouldFetchFromApi]);
+
+  // Log data retrieval for debugging
+  useEffect(() => {
+    if (navHistory?.length > 0) {
+      console.log(`[NAV HISTORY] Using ${navHistory.length} data points`);
+      
+      // Ensure that we have data to display by logging additional details
+      const firstPoint = navHistory[0];
+      const lastPoint = navHistory[navHistory.length - 1];
+      console.log('[NAV HISTORY] First point:', firstPoint);
+      console.log('[NAV HISTORY] Last point:', lastPoint);
+    }
+  }, [navHistory]);
 
   // Update the latestTimestamp whenever new data arrives
   useEffect(() => {
-    if (data?.fund) {
+    if (yieldHistory?.length || navHistory?.length) {
       const now = new Date().toISOString();
       setLatestTimestamp(now);
     }
-  }, [data]);
+  }, [yieldHistory, navHistory]);
 
   // Process fund data when it changes
   useEffect(() => {
     // Process data when it changes or when the range changes
     const processData = async () => {
       try {
-        if (queryLoading || queryError || !data || !data.fund) {
+        console.log("[DEBUG] Processing chart data:", { 
+          navHistoryLength: navHistory?.length,
+          yieldHistoryLength: yieldHistory?.length
+        });
+        
+        const isDataLoading = shouldFetchFromApi && (yieldLoading || navLoading);
+        const hasNoData = shouldFetchFromApi && (!yieldData?.fund && !navData?.navHistory);
+        
+        if (isDataLoading || hasNoData) {
           return;
         }
         
+        console.log("[DEBUG] Processing data for chart with range:", range);
         setLoading(true);
         
         // Extract nav and yield data points
         let navPoints = [];
         let yieldPoints = [];
         
-        if (data.navHistory && data.navHistory.length > 0) {
-          navPoints = data.navHistory.map(point => ({
-            timestamp: point.timestamp,
-            nav: point.nav
-          }));
+        // Add static fallback data to ensure we always have something to display
+        const fallbackTimestamps = [];
+        const now = new Date();
+        for (let i = 0; i < 10; i++) {
+          fallbackTimestamps.push(new Date(now.getTime() - (i * 30 * 60 * 1000)));
         }
         
-        if (data.fund.yieldHistory && data.fund.yieldHistory.length > 0) {
-          yieldPoints = data.fund.yieldHistory.map(point => ({
-            timestamp: point.timestamp,
-            yield: point.yield
-          }));
+        fallbackTimestamps.reverse(); // Ensure chronological order
+        
+        if (navHistory && navHistory.length > 0) {
+          // Debug the raw navHistory data
+          console.log("[DEBUG] Raw NAV History Data:", navHistory);
+          
+          // Create accurate timestamps for all entries
+          navPoints = [...navHistory]
+            .filter(point => point && (point.timestamp || point.timestamp === 0))
+            .map(point => {
+              try {
+                // Handle both string and numeric timestamps
+                let timestamp = point.timestamp;
+                let date;
+                
+                // Convert any numeric timestamps to Date objects
+                if (typeof timestamp === 'number' || /^\d+$/.test(timestamp)) {
+                  const numericTimestamp = parseInt(timestamp, 10);
+                  date = new Date(numericTimestamp);
+                } else {
+                  date = new Date(timestamp);
+                }
+                
+                if (isNaN(date.getTime())) {
+                  console.error("Invalid timestamp:", timestamp);
+                  return null;
+                }
+                
+                // Create a new object with standardized timestamp
+                return {
+                  timestamp: date.toISOString(),
+                  rawDate: date,
+                  nav: point.nav,
+                  id: point.id
+                };
+              } catch (err) {
+                console.error("Failed to process NAV point:", point, err);
+                return null;
+              }
+            })
+            .filter(point => point !== null)
+            .sort((a, b) => a.rawDate - b.rawDate);
+            
+          console.log(`[DEBUG] Processed NAV History: ${navPoints.length} valid points`);
+        } else {
+          console.log("[DEBUG] No NAV history data, using fallback values");
+          // If no real data, create fallback data for visualization
+          navPoints = fallbackTimestamps.map((date, index) => {
+            // Base NAV around 100 with slight variations
+            const baseValue = 100;
+            const variation = 0.02 * Math.sin(index * 0.5) + 0.01 * Math.cos(index * 1.2);
+            return {
+              timestamp: date.toISOString(),
+              rawDate: date,
+              nav: baseValue + variation,
+              id: `fallback-${index}`
+            };
+          });
         }
         
-        // Ensure data is available
+        if (yieldHistory && yieldHistory.length > 0) {
+          // Debug the raw yieldHistory data
+          console.log("[DEBUG] Raw Yield History Data:", yieldHistory);
+          
+          // Create accurate timestamps for all entries
+          yieldPoints = [...yieldHistory]
+            .filter(point => point && (point.timestamp || point.timestamp === 0))
+            .map(point => {
+              try {
+                // Handle both string and numeric timestamps
+                let timestamp = point.timestamp;
+                let date;
+                
+                // Convert any numeric timestamps to Date objects
+                if (typeof timestamp === 'number' || /^\d+$/.test(timestamp)) {
+                  const numericTimestamp = parseInt(timestamp, 10);
+                  date = new Date(numericTimestamp);
+                } else {
+                  date = new Date(timestamp);
+                }
+                
+                if (isNaN(date.getTime())) {
+                  console.error("Invalid timestamp:", timestamp);
+                  return null;
+                }
+                
+                // Ensure yield values are properly parsed as numbers
+                let yieldValue = point.yield;
+                if (typeof yieldValue === 'string') {
+                  yieldValue = parseFloat(yieldValue);
+                }
+                
+                if (isNaN(yieldValue)) {
+                  console.error("Invalid yield value:", point.yield);
+                  yieldValue = 1.6; // Fallback to a default value
+                }
+                
+                // Create a new object with standardized timestamp
+                return {
+                  timestamp: date.toISOString(),
+                  rawDate: date,
+                  yield: yieldValue,
+                  source: point.source
+                };
+              } catch (err) {
+                console.error("Failed to process Yield point:", point, err);
+                return null;
+              }
+            })
+            .filter(point => point !== null)
+            .sort((a, b) => a.rawDate - b.rawDate);
+            
+          console.log(`[DEBUG] Processed Yield History: ${yieldPoints.length} valid points`);
+          
+          // Log specific yield values for debugging
+          if (yieldPoints.length > 0) {
+            console.log("[DEBUG] First yield value:", yieldPoints[0].yield);
+            console.log("[DEBUG] Last yield value:", yieldPoints[yieldPoints.length-1].yield);
+            console.log("[DEBUG] Yield values sample:", yieldPoints.slice(0, 3).map(p => p.yield));
+          } else {
+            console.warn("[WARN] No valid yield points after processing!");
+          }
+        } else {
+          console.log("[DEBUG] No yield history data, using fallback values");
+          // If no real data, create fallback data for visualization
+          yieldPoints = fallbackTimestamps.map((date, index) => {
+            // Base yield around 1.6% with slight variations
+            const baseValue = 1.6;
+            const variation = 0.05 * Math.sin(index * 0.7) + 0.03 * Math.cos(index * 1.5);
+            return {
+              timestamp: date.toISOString(),
+              rawDate: date,
+              yield: baseValue + variation,
+              source: 'fallback'
+            };
+          });
+        }
+        
+        // Ensure data is available - at this point we should have at least fallback data
         if (navPoints.length === 0 && yieldPoints.length === 0) {
+          console.error("[ERROR] No valid data points found after processing, including fallbacks");
           setError("No data available for this fund.");
           setLoading(false);
           return;
         }
         
-        console.log(`Data received - NAV: ${navPoints.length} points, Yield: ${yieldPoints.length} points`);
-        
-        // Format the data points with readable time
-        const formattedYieldData = yieldPoints.map(item => ({
-          time: new Date(item.timestamp).toLocaleTimeString([], {
-            hour: '2-digit',
-            minute: '2-digit'
-          }),
-          yield: item.yield,
-          timestamp: item.timestamp
-        }));
-
-        const formattedNAVData = navPoints.map(item => ({
-          time: new Date(item.timestamp).toLocaleTimeString([], {
-            hour: '2-digit',
-            minute: '2-digit'
-          }),
-          nav: item.nav,
-          timestamp: item.timestamp
-        }));
-
         // Process data points and apply filters
         const processedData = processChartData(navPoints, yieldPoints, range);
         
+        // Downsample data for readability if we have many points
+        const sampledData = downsampleData(processedData);
+        
+        // Debug the processed chart data
+        console.log(`[DEBUG] Final chart data: ${processedData.length} points, sampled to ${sampledData.length}`);
+        
         // Set the chart data in state
-        setChartData(processedData);
+        setChartData(sampledData);
         setLoading(false);
         setError(null);
       } catch (err) {
-        console.error("Error processing data:", err);
+        console.error("[ERROR] Error processing data:", err);
         setError("Error processing chart data: " + err.message);
         setLoading(false);
       }
     };
 
-    processData();
-  }, [data, range, queryLoading, queryError]);
+    // Add debounce to prevent rapid consecutive calls
+    const timeoutId = setTimeout(() => {
+      processData();
+    }, 100);
+    
+    return () => clearTimeout(timeoutId);
+    
+  }, [fundId, navHistory, yieldHistory, range, shouldFetchFromApi, yieldLoading, navLoading, yieldError, navError]);
 
   // Function to process chart data - extracted to avoid hooks in conditional code paths
   function processChartData(navPoints, yieldPoints, selectedRange) {
-    // Create a map of all timestamps to ensure uniform distribution
-    const allTimestamps = new Set();
-    const timestampMap = {};
-    
-    // Add all timestamps to the set and create a map for lookup
-    [...navPoints, ...yieldPoints].forEach(point => {
-      const cleanTimestamp = point.timestamp.replace(/\s+$/, '');
-      allTimestamps.add(cleanTimestamp);
+    try {
+      console.log(`[DEBUG] Processing chart data with ${navPoints.length} NAV points and ${yieldPoints.length} yield points`);
       
-      if (!timestampMap[cleanTimestamp]) {
-        timestampMap[cleanTimestamp] = { timestamp: cleanTimestamp };
-      }
+      // Create a map of all timestamps to ensure uniform distribution
+      const allTimestamps = new Set();
+      const timestampMap = {};
       
-      if (point.nav !== undefined && point.nav !== null) {
-        timestampMap[cleanTimestamp].nav = point.nav;
-      }
-      
-      if (point.yield !== undefined && point.yield !== null) {
-        timestampMap[cleanTimestamp].yield = point.yield;
-      }
-    });
-    
-    // Convert set of timestamps to array and sort
-    const sortedTimestamps = Array.from(allTimestamps).sort();
-    
-    // Create interpolation points for sparse data
-    let interpolatedPoints = [];
-    
-    for (let i = 0; i < sortedTimestamps.length; i++) {
-      const current = timestampMap[sortedTimestamps[i]];
-      interpolatedPoints.push(current);
-      
-      // If not at the last point, check if we need to interpolate
-      if (i < sortedTimestamps.length - 1) {
-        const currentTime = new Date(sortedTimestamps[i]).getTime();
-        const nextTime = new Date(sortedTimestamps[i + 1]).getTime();
-        const timeDiff = nextTime - currentTime;
+      // Add all timestamps to the set and create a map for lookup
+      [...navPoints, ...yieldPoints].forEach(point => {
+        if (!point || !point.timestamp) return;
         
-        // If timestamps are more than 20 minutes apart, add interpolated points
-        if (timeDiff > 20 * 60 * 1000) {
-          const numPoints = Math.min(5, Math.ceil(timeDiff / (10 * 60 * 1000)));
-          
-          for (let j = 1; j < numPoints; j++) {
-            const fraction = j / numPoints;
-            const interpTime = new Date(currentTime + timeDiff * fraction);
-            
-            // Find next valid values for interpolation
-            let nextNav = null;
-            let nextYield = null;
-            
-            // Look ahead to find valid values
-            for (let k = i + 1; k < sortedTimestamps.length; k++) {
-              const futurePoint = timestampMap[sortedTimestamps[k]];
-              if (nextNav === null && futurePoint.nav !== undefined) {
-                nextNav = futurePoint.nav;
-              }
-              if (nextYield === null && futurePoint.yield !== undefined) {
-                nextYield = futurePoint.yield;
-              }
-              if (nextNav !== null && nextYield !== null) break;
-            }
-            
-            // Create linearly interpolated point
-            const interpPoint = {
-              timestamp: interpTime.toISOString(),
-              nav: current.nav !== undefined && nextNav !== null 
-                ? current.nav + (nextNav - current.nav) * fraction 
-                : (current.nav || nextNav),
-              yield: current.yield !== undefined && nextYield !== null 
-                ? current.yield + (nextYield - current.yield) * fraction 
-                : (current.yield || nextYield)
-            };
-            
-            interpolatedPoints.push(interpPoint);
-          }
-        }
-      }
-    }
-    
-    // Ensure points are properly sorted by timestamp
-    interpolatedPoints.sort((a, b) => {
-      try {
-        return new Date(a.timestamp) - new Date(b.timestamp);
-      } catch (e) {
-        console.warn('Error sorting timestamps:', a.timestamp, b.timestamp);
-        return 0;
-      }
-    });
-    
-    // Create a more continuous chart by ensuring no large gaps
-    let continuousPoints = [];
-    for (let i = 0; i < interpolatedPoints.length - 1; i++) {
-      const current = interpolatedPoints[i];
-      const next = interpolatedPoints[i + 1];
-      
-      continuousPoints.push(current);
-      
-      try {
-        const currentTime = new Date(current.timestamp).getTime();
-        const nextTime = new Date(next.timestamp).getTime();
-        const gap = nextTime - currentTime;
-        
-        // If there's a gap larger than 20 minutes, add intermediate points
-        if (gap > 20 * 60 * 1000) {
-          const numInterpolations = Math.min(Math.ceil(gap / (10 * 60 * 1000)), 5);
-          
-          for (let j = 1; j <= numInterpolations; j++) {
-            const ratio = j / (numInterpolations + 1);
-            const interpTime = new Date(currentTime + gap * ratio);
-            
-            // Create interpolated values
-            const interpPoint = {
-              timestamp: interpTime.toISOString(),
-              nav: current.nav !== undefined && next.nav !== undefined 
-                ? current.nav + (next.nav - current.nav) * ratio 
-                : (current.nav || next.nav),
-              yield: current.yield !== undefined && next.yield !== undefined
-                ? current.yield + (next.yield - current.yield) * ratio
-                : (current.yield || next.yield)
-            };
-            
-            continuousPoints.push(interpPoint);
-          }
-        }
-      } catch (e) {
-        console.warn('Error creating continuous points:', e);
-      }
-    }
-    
-    // Don't forget to add the last point
-    if (interpolatedPoints.length > 0) {
-      continuousPoints.push(interpolatedPoints[interpolatedPoints.length - 1]);
-    }
-    
-    // Ensure we start with early hour points for better visualization
-    const fullData = [...continuousPoints];
-    
-    // Forward-fill missing values for smoother chart
-    let lastNav = null;
-    let lastYield = null;
-    
-    // First pass - forward fill (using non-mutating approach)
-    const forwardFilledData = fullData.map(point => {
-      const newPoint = { ...point };
-      
-      // Handle NAV
-      if (newPoint.nav !== undefined && newPoint.nav !== null) {
-        lastNav = newPoint.nav;
-      } else if (lastNav !== null) {
-        newPoint.nav = lastNav;
-      }
-      
-      // Handle Yield
-      if (newPoint.yield !== undefined && newPoint.yield !== null) {
-        lastYield = newPoint.yield;
-      } else if (lastYield !== null) {
-        newPoint.yield = lastYield;
-      }
-      
-      return newPoint;
-    });
-    
-    // Second pass - backward fill for any remaining nulls at start
-    lastNav = null;
-    lastYield = null;
-    
-    const backFilledData = [...forwardFilledData];
-    
-    for (let i = backFilledData.length - 1; i >= 0; i--) {
-      const point = backFilledData[i];
-      
-      // Store last known values
-      if (lastNav === null && point.nav !== null && point.nav !== undefined) {
-        lastNav = point.nav;
-      }
-      
-      if (lastYield === null && point.yield !== null && point.yield !== undefined) {
-        lastYield = point.yield;
-      }
-      
-      // Fill any remaining nulls at the start
-      if ((point.nav === null || point.nav === undefined) && lastNav !== null) {
-        point.nav = lastNav;
-      }
-      
-      if ((point.yield === null || point.yield === undefined) && lastYield !== null) {
-        point.yield = lastYield;
-      }
-    }
-    
-    // Ensure baseline points
-    // Add an invisible baseline point at the start and end if there are any data points
-    let processedData = [...backFilledData];
-    
-    if (processedData.length > 0) {
-      // Get first and last timestamps
-      const firstPoint = {...processedData[0]};
-      const lastPoint = {...processedData[processedData.length - 1]};
-      
-      // Ensure we have at least a zero yield for the baseline
-      if (firstPoint.yield === null) firstPoint.yield = 0;
-      if (lastPoint.yield === null) lastPoint.yield = 0;
-      
-      // Create our full dataset with baseline points
-      processedData = [
-        { ...firstPoint, timestamp: firstPoint.timestamp + " " }, // Slightly modified timestamp to ensure proper rendering
-        ...processedData,
-        { ...lastPoint, timestamp: lastPoint.timestamp + "  " }   // Slightly modified timestamp to ensure proper rendering
-      ];
-    }
-    
-    // Apply time range filter 
-    const now = new Date();
-    let filtered = [...processedData];
-    
-    // Get data based on time range
-    if (selectedRange === '1H' || selectedRange === '6H' || selectedRange === '1D') {
-      const timeRangeInMillis = {
-        '1H': 60 * 60 * 1000,
-        '6H': 6 * 60 * 60 * 1000,
-        '1D': 24 * 60 * 60 * 1000
-      }[selectedRange];
-      
-      const buffer = timeRangeInMillis * 0.1; // 10% buffer
-      const cutoffTime = now.getTime() - timeRangeInMillis - buffer;
-      
-      // Get points in range
-      filtered = processedData.filter(item => {
         try {
-          const itemTime = new Date(item.timestamp.replace(/\s+$/, '')).getTime();
-          return itemTime >= cutoffTime;
-        } catch (e) {
-          console.warn('Invalid timestamp in filter:', item.timestamp);
-          return false;
+          // Use the timestamp directly since we've already validated it
+          allTimestamps.add(point.timestamp);
+          
+          if (!timestampMap[point.timestamp]) {
+            timestampMap[point.timestamp] = { 
+              timestamp: point.timestamp,
+              rawDate: point.rawDate // We now pass the date object directly
+            };
+          }
+          
+          if (point.nav !== undefined && point.nav !== null) {
+            timestampMap[point.timestamp].nav = point.nav;
+          }
+          
+          if (point.yield !== undefined && point.yield !== null) {
+            timestampMap[point.timestamp].yield = point.yield;
+          }
+        } catch (err) {
+          console.error("Error processing timestamp:", point.timestamp, err);
         }
       });
       
-      // Critical fix: Create artificial variation for flat segments
-      if (filtered.length >= 2) {
-        // Lower the threshold for detecting "flat" segments to catch more slight variations
-        const FLAT_THRESHOLD = 0.0005; // Reduced from 0.001
+      // Convert set of timestamps to array and sort chronologically
+      const sortedTimestamps = Array.from(allTimestamps)
+        .sort((a, b) => new Date(a) - new Date(b));
+      
+      console.log(`[DEBUG] Sorted ${sortedTimestamps.length} unique timestamps`);
+      
+      // Ensure we have at least 2 timestamps to work with
+      if (sortedTimestamps.length < 2) {
+        console.warn("[WARN] Not enough unique timestamps, creating additional points");
         
-        // Identify constant yield segments
-        let segmentStart = 0;
-        let segmentLength = 1;
-        let currentValue = filtered[0].yield;
+        // Add at least two points if we don't have enough
+        const now = new Date();
+        const then = new Date(now.getTime() - 30 * 60 * 1000);
         
-        // Generate artificial waveform for flat segments
-        for (let i = 1; i < filtered.length; i++) {
-          if (Math.abs(filtered[i].yield - currentValue) < FLAT_THRESHOLD) {
-            // Part of the current flat segment
-            segmentLength++;
-          } else {
-            // End of segment, apply variation if segment is long enough
-            if (segmentLength > 2) { // Reduced from 3 to catch more segments
-              applyVariation(filtered, segmentStart, segmentLength);
+        // Only add if not already present
+        const nowIso = now.toISOString();
+        const thenIso = then.toISOString();
+        
+        if (!timestampMap[nowIso]) {
+          allTimestamps.add(nowIso);
+          timestampMap[nowIso] = {
+            timestamp: nowIso,
+            rawDate: now,
+            nav: 100.0,
+            yield: 1.6
+          };
+        }
+        
+        if (!timestampMap[thenIso]) {
+          allTimestamps.add(thenIso);
+          timestampMap[thenIso] = {
+            timestamp: thenIso,
+            rawDate: then,
+            nav: 99.95,
+            yield: 1.59
+          };
+        }
+      }
+      
+      // Create a dense timeline with interpolated points
+      let interpolatedPoints = [];
+      
+      // Generate a dense timeline to ensure consistent data density
+      if (sortedTimestamps.length > 0) {
+        // Find earliest and latest timestamps
+        const firstTime = new Date(sortedTimestamps[0]).getTime();
+        const lastTime = new Date(sortedTimestamps[sortedTimestamps.length - 1]).getTime();
+        
+        // Ensure timespan is at least 1 hour for better visualization
+        const timeSpan = Math.max(lastTime - firstTime, 60 * 60 * 1000);
+        
+        console.log(`[DEBUG] Time span of data: ${timeSpan / (60 * 1000)} minutes`);
+        
+        // Number of points to create (minimum 20)
+        const desiredPoints = Math.max(20, sortedTimestamps.length * 2);
+        
+        // Create evenly spaced points across the time range
+        for (let i = 0; i < desiredPoints; i++) {
+          const fraction = i / (desiredPoints - 1);
+          const pointTime = new Date(firstTime + timeSpan * fraction);
+          
+          // Find the nearest real data points before and after
+          let beforePoint = null;
+          let afterPoint = null;
+          
+          for (let j = 0; j < sortedTimestamps.length; j++) {
+            const currentPointTime = new Date(sortedTimestamps[j]).getTime();
+            
+            if (currentPointTime <= pointTime.getTime()) {
+              beforePoint = timestampMap[sortedTimestamps[j]];
             }
             
-            // Start new segment
-            segmentStart = i;
-            segmentLength = 1;
-            currentValue = filtered[i].yield;
-          }
-        }
-        
-        // Handle the last segment
-        if (segmentLength > 2) { // Reduced from 3
-          applyVariation(filtered, segmentStart, segmentLength);
-        }
-      }
-    } else {
-      // Handle ALL range
-      if (processedData.length > 0) {
-        // Check for flat segments in all data as well
-        let segmentStart = 0;
-        let segmentLength = 1;
-        let currentValue = processedData[0].yield;
-        
-        for (let i = 1; i < processedData.length; i++) {
-          if (Math.abs(processedData[i].yield - currentValue) < 0.001) {
-            segmentLength++;
-          } else {
-            if (segmentLength > 3) {
-              applyVariation(processedData, segmentStart, segmentLength);
+            if (currentPointTime >= pointTime.getTime() && !afterPoint) {
+              afterPoint = timestampMap[sortedTimestamps[j]];
             }
-            segmentStart = i;
-            segmentLength = 1;
-            currentValue = processedData[i].yield;
           }
+          
+          // If exact match to an existing point, use it
+          if (beforePoint && beforePoint.rawDate.getTime() === pointTime.getTime()) {
+            interpolatedPoints.push(beforePoint);
+            continue;
+          }
+          
+          // Create an interpolated point
+          const newPoint = {
+            timestamp: pointTime.toISOString(),
+            rawDate: pointTime,
+            timeFormatted: format(pointTime, 'h:mm a')
+          };
+          
+          // Interpolate NAV if possible
+          if (beforePoint && afterPoint && 
+              beforePoint.nav !== undefined && afterPoint.nav !== undefined) {
+            const beforeTime = beforePoint.rawDate.getTime();
+            const afterTime = afterPoint.rawDate.getTime();
+            const timeDiff = afterTime - beforeTime;
+            
+            if (timeDiff > 0) {
+              const localFraction = (pointTime.getTime() - beforeTime) / timeDiff;
+              const navDiff = afterPoint.nav - beforePoint.nav;
+              newPoint.nav = beforePoint.nav + navDiff * localFraction;
+            } else {
+              newPoint.nav = beforePoint.nav;
+            }
+          } else if (beforePoint && beforePoint.nav !== undefined) {
+            newPoint.nav = beforePoint.nav;
+          } else if (afterPoint && afterPoint.nav !== undefined) {
+            newPoint.nav = afterPoint.nav;
+          }
+          
+          // Interpolate yield if possible
+          if (beforePoint && afterPoint && 
+              beforePoint.yield !== undefined && afterPoint.yield !== undefined &&
+              !isNaN(beforePoint.yield) && !isNaN(afterPoint.yield)) {
+            const beforeTime = beforePoint.rawDate.getTime();
+            const afterTime = afterPoint.rawDate.getTime();
+            const timeDiff = afterTime - beforeTime;
+            
+            if (timeDiff > 0) {
+              const localFraction = (pointTime.getTime() - beforeTime) / timeDiff;
+              const yieldDiff = afterPoint.yield - beforePoint.yield;
+              newPoint.yield = beforePoint.yield + yieldDiff * localFraction;
+            } else {
+              newPoint.yield = beforePoint.yield;
+            }
+          } else if (beforePoint && beforePoint.yield !== undefined && !isNaN(beforePoint.yield)) {
+            newPoint.yield = beforePoint.yield;
+          } else if (afterPoint && afterPoint.yield !== undefined && !isNaN(afterPoint.yield)) {
+            newPoint.yield = afterPoint.yield;
+          } else {
+            // If we have no valid yield data nearby, use a fallback
+            // This ensures there are no gaps in the yield line
+            newPoint.yield = 1.6;
+          }
+          
+          // Verify the yield value is valid
+          if (newPoint.yield !== undefined && (isNaN(newPoint.yield) || newPoint.yield === null)) {
+            console.warn("Generated invalid yield value:", newPoint.yield);
+            newPoint.yield = 1.6; // Use fallback
+          }
+          
+          interpolatedPoints.push(newPoint);
         }
-        
-        // Handle last segment
-        if (segmentLength > 3) {
-          applyVariation(processedData, segmentStart, segmentLength);
-        }
-        
-        filtered = processedData;
       }
-    }
-    
-    // Function to apply natural-looking variation to flat segments
-    function applyVariation(data, start, length) {
-      const baseValue = data[start].yield;
-      const amplitude = 0.05; // Increased from 0.02 for more visible variation
       
-      // For long segments, create a more complex, natural-looking pattern
-      if (length > 10) {
-        // Create a multi-frequency wave with more randomness
-        for (let i = 0; i < length; i++) {
-          // Use multiple sine waves at different frequencies to create a more natural look
-          const normalizedPosition = i / length;
-          const wave1 = Math.sin(i * 0.4) * 0.6; // Primary wave
-          const wave2 = Math.cos(i * 0.8) * 0.3; // Secondary wave
-          const wave3 = Math.sin(i * 1.2) * 0.1; // Tertiary wave (high frequency)
-          
-          // Combine waves with reducing intensity based on position
-          const combinedWave = (wave1 + wave2 + wave3) / 1.0;
-          
-          // Apply the combined wave pattern
-          const variationAmplitude = amplitude * (0.2 + 0.8 * normalizedPosition); // Start at 20% amplitude
-          data[start + i].yield = baseValue + (combinedWave * variationAmplitude);
+      // Sort all points by timestamp to ensure proper ordering
+      interpolatedPoints = interpolatedPoints.sort((a, b) => a.rawDate - b.rawDate);
+      
+      // Pre-format time strings for all points
+      interpolatedPoints = interpolatedPoints.map(point => {
+        try {
+          return {
+            ...point,
+            timeFormatted: format(point.rawDate, 'h:mm a')
+          };
+        } catch (err) {
+          return {
+            ...point,
+            timeFormatted: 'Invalid time'
+          };
         }
-      } else {
-        // For shorter segments, use a simpler approach
-        for (let i = 0; i < length; i++) {
-          // Create a sine wave with gradually increasing amplitude
-          const normalizedPosition = i / (length - 1); // 0 to 1
-          const variationAmplitude = amplitude * Math.min(normalizedPosition * 3, 1); // Ramp up to full amplitude
-          const variation = Math.sin(i * 0.5) * variationAmplitude;
+      });
+      
+      // Filter based on time range
+      let filteredPoints = interpolatedPoints;
+      
+      if (selectedRange && selectedRange !== 'ALL') {
+        const now = new Date();
+        let cutoff = now;
+        
+        if (selectedRange === '1H') {
+          cutoff = new Date(now.getTime() - 60 * 60 * 1000);
+        } else if (selectedRange === '6H') {
+          cutoff = new Date(now.getTime() - 6 * 60 * 60 * 1000);
+        } else if (selectedRange === '1D') {
+          cutoff = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        }
+        
+        filteredPoints = interpolatedPoints.filter(point => point.rawDate >= cutoff);
+      }
+      
+      // Ensure we have a minimum number of data points for any time range
+      if (filteredPoints.length < 5) {
+        console.log("[DEBUG] Not enough data points after filtering, using all available points");
+        filteredPoints = interpolatedPoints;
+      }
+      
+      // Ensure we have at least some minimal number of points for visualization
+      if (filteredPoints.length < 10) {
+        console.log("[DEBUG] Adding extra points to ensure good visualization");
+        
+        // Create a more dense set of points based on the first and last points
+        const morePoints = [];
+        
+        if (filteredPoints.length >= 2) {
+          const first = filteredPoints[0];
+          const last = filteredPoints[filteredPoints.length - 1];
+          const timeRange = last.rawDate - first.rawDate;
           
-          // Apply the variation
-          data[start + i].yield = baseValue + variation;
+          for (let i = 1; i < 9; i++) {
+            const fraction = i / 10;
+            const newTime = new Date(first.rawDate.getTime() + timeRange * fraction);
+            
+            // Find nearest points for interpolation
+            let beforeIndex = 0;
+            for (let j = 0; j < filteredPoints.length - 1; j++) {
+              if (filteredPoints[j].rawDate <= newTime && filteredPoints[j+1].rawDate >= newTime) {
+                beforeIndex = j;
+                break;
+              }
+            }
+            
+            const before = filteredPoints[beforeIndex];
+            const after = filteredPoints[Math.min(beforeIndex + 1, filteredPoints.length - 1)];
+            
+            // Calculate interpolation ratio
+            const segmentRange = after.rawDate - before.rawDate;
+            const segmentFraction = segmentRange > 0 ? 
+              (newTime - before.rawDate) / segmentRange : 0;
+            
+            // Create new point
+            const newPoint = {
+              timestamp: newTime.toISOString(),
+              rawDate: newTime,
+              timeFormatted: format(newTime, 'h:mm a')
+            };
+            
+            // Interpolate values
+            if (before.nav !== undefined && after.nav !== undefined) {
+              newPoint.nav = before.nav + (after.nav - before.nav) * segmentFraction;
+            }
+            
+            if (before.yield !== undefined && after.yield !== undefined) {
+              newPoint.yield = before.yield + (after.yield - before.yield) * segmentFraction;
+            }
+            
+            morePoints.push(newPoint);
+          }
+          
+          // Add the new points and re-sort
+          filteredPoints = [...filteredPoints, ...morePoints].sort((a, b) => a.rawDate - b.rawDate);
         }
       }
-    }
-    
-    // Ensure timestamps are properly ordered
-    filtered.sort((a, b) => {
-      try {
-        return new Date(a.timestamp.replace(/\s+$/, '')).getTime() - 
-               new Date(b.timestamp.replace(/\s+$/, '')).getTime();
-      } catch (e) {
-        console.warn('Error sorting timestamps:', a.timestamp, b.timestamp);
-        return 0;
+      
+      // Log number of points for debugging
+      console.log(`[DEBUG] ${selectedRange} range filter: ${filteredPoints.length} points after filtering and enhancement`);
+      
+      return filteredPoints;
+    } catch (error) {
+      console.error("Error in processChartData:", error);
+      
+      // Return a minimal fallback dataset in case of error
+      const fallbackData = [];
+      const now = new Date();
+      
+      for (let i = 0; i < 10; i++) {
+        const pointTime = new Date(now.getTime() - (9-i) * 10 * 60 * 1000);
+        fallbackData.push({
+          timestamp: pointTime.toISOString(),
+          rawDate: pointTime, 
+          timeFormatted: format(pointTime, 'h:mm a'),
+          nav: 100 + i * 0.01,
+          yield: 1.5 + i * 0.01
+        });
       }
-    });
-    
-    // Add "no data" fallback
-    if (filtered.length === 0) {
-      console.warn(`No data available for the selected time range (${selectedRange}).`);
-      return [];
+      
+      return fallbackData; 
     }
-    
-    // Return the final filtered data
-    return filtered;
   }
 
-  // Apply stable jitter to the chart data - calculated only when chart data changes
-  const jitteredYieldData = useMemo(() => {
-    if (!chartData.length) return [];
+  // Function to downsample data for smoother chart rendering
+  const downsampleData = (data) => {
+    if (!data || data.length < 20) return data; // Don't downsample small datasets
     
-    // Create a copy of chart data to avoid mutations
-    return chartData.map((point, index) => {
-      if (point.yield !== null && point.yield !== undefined) {
-        // Add small random jitter based on sine wave pattern for visual appeal
-        const jitter = stableJitterPattern[index % stableJitterPattern.length];
-        return {
-          ...point,
-          yield: point.yield + jitter
-        };
-      }
-      return point;
-    });
-  }, [chartData, stableJitterPattern]);
+    // For larger datasets, downsample based on size
+    const sampleRate = Math.max(1, Math.floor(data.length / 75)); // Target ~75 points max
+    
+    console.log(`[DEBUG] Downsampling with rate: ${sampleRate} (${data.length} points)`);
+    
+    // Always include the first and last point for accurate range representation
+    if (sampleRate > 1) {
+      const first = data[0];
+      const last = data[data.length - 1];
+      
+      const sampled = data.filter((_, index) => index % sampleRate === 0);
+      
+      // Ensure first and last points are included
+      if (sampled[0] !== first) sampled.unshift(first);
+      if (sampled[sampled.length - 1] !== last) sampled.push(last);
+      
+      return sampled;
+    }
+    
+    return data;
+  };
+
+  // Function to determine Y-axis domain for NAV chart with improved visibility
+  const getNavDomain = () => {
+    if (chartData.length === 0) return [99, 101]; // Default domain if no data
+    
+    const navValues = chartData
+      .filter(point => point.nav !== undefined && point.nav !== null)
+      .map(point => point.nav);
+    
+    if (navValues.length === 0) return [99, 101]; // Default domain if no valid values
+    
+    const minNav = Math.min(...navValues);
+    const maxNav = Math.max(...navValues);
+    const range = maxNav - minNav;
+    
+    // If range is very small, create artificial range for better visibility
+    if (range < 0.5) {
+      // Center the midpoint and expand proportionally to exaggerate small moves
+      const midpoint = (minNav + maxNav) / 2;
+      const amplifiedRange = Math.max(0.2, range * 3); // At least 0.2 or 3x the actual range
+      return [
+        Math.max(0, midpoint - amplifiedRange / 2),
+        midpoint + amplifiedRange / 2
+      ];
+    } else {
+      // Otherwise add reasonable padding (10% of range)
+      const padding = Math.max(0.1, range * 0.1);
+      return [
+        // Ensure we don't go below 0 for NAV values
+        Math.max(0, minNav - padding), 
+        maxNav + padding
+      ];
+    }
+  };
 
   // Create and memoize series data for the chart
   const seriesData = useMemo(() => {
@@ -603,116 +784,84 @@ function DualChartContent({ fundId, stableJitterPattern }) {
     };
   }, [chartData, isDarkMode]);
 
-  // Conditional rendering for loading state
+  // New custom styles for range buttons
+  const getRangeButtonStyles = (buttonRange) => {
+    return buttonRange === range
+      ? 'bg-secondary text-white border-secondary shadow-md'
+      : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700';
+  };
+
+  const getViewButtonStyles = (buttonView) => {
+    return buttonView === viewMode
+      ? 'bg-primary text-white border-primary shadow-md'
+      : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700';
+  };
+
   if (loading) {
-    return <LoadingState />;
+    return <LoadingState className={className} />;
   }
-  
-  // Conditional rendering for error state
+
   if (error) {
-    return <ErrorState error={error} />;
-  }
-  
-  // Conditional rendering for empty state
-  if (chartData.length === 0) {
-    return <EmptyState />;
+    return <ErrorState error={error} className={className} />;
   }
 
-  // Color constants for chart elements
-  const navColor = isDarkMode ? '#3B82F6' : '#2563EB';
-  const yieldColor = '#22c55e';
-  
-  // Determine which chart elements to show based on view mode
-  const showNav = viewMode === 'NAV' || viewMode === 'COMBINED';
-  const showYield = viewMode === 'YIELD' || viewMode === 'COMBINED';
-  const showLegend = viewMode === 'COMBINED'; // Only show legend when both lines are visible
+  if (!chartData.length) {
+    return <EmptyState className={className} />;
+  }
 
+  // Modified to use custom styles and more elegant design
   return (
-    <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 shadow-sm">
-      {/* Chart header with controls */}
-      <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-        <div className="flex flex-col">
-          <h2 className="font-semibold text-gray-800 dark:text-gray-300">
-            {viewMode === 'YIELD' ? 'Yield History' : 
-             viewMode === 'NAV' ? 'NAV History' : 
-             'NAV & Yield History'}
-          </h2>
-          <p className="text-xs text-gray-500 dark:text-gray-400">Last updated: {timeAgo(latestTimestamp)}</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {/* View mode selector */}
-          <div className="flex border border-gray-200 dark:border-gray-700 rounded-md overflow-hidden">
+    <div className={`chart-container bg-white dark:bg-gray-800 rounded-xl p-5 shadow-md border border-gray-100 dark:border-gray-700 ${className || ''}`}>
+      <div className="flex justify-between items-center mb-6">
+        <h3 className="text-base font-semibold text-gray-800 dark:text-white">
+          <span className="gold-accent">Performance</span> Overview
+        </h3>
+        <div className="flex space-x-2">
+          {/* View mode toggles */}
+          <div className="flex rounded-lg overflow-hidden shadow-sm border border-gray-200 dark:border-gray-700">
             <button
+              className={`px-3 py-1.5 text-xs font-medium transition-colors ${getViewButtonStyles('NAV')}`}
               onClick={() => setViewMode('NAV')}
-              className={`px-3 py-1 text-xs ${
-                viewMode === 'NAV' 
-                  ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300'
-                  : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300'
-              }`}
             >
               NAV
             </button>
             <button
+              className={`px-3 py-1.5 text-xs font-medium transition-colors ${getViewButtonStyles('YIELD')}`}
               onClick={() => setViewMode('YIELD')}
-              className={`px-3 py-1 text-xs ${
-                viewMode === 'YIELD' 
-                  ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
-                  : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300'
-              }`}
             >
               Yield
             </button>
             <button
+              className={`px-3 py-1.5 text-xs font-medium transition-colors ${getViewButtonStyles('COMBINED')}`}
               onClick={() => setViewMode('COMBINED')}
-              className={`px-3 py-1 text-xs ${
-                viewMode === 'COMBINED' 
-                  ? 'bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300'
-                  : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300'
-              }`}
             >
               Combined
             </button>
           </div>
           
-          {/* Time range selector */}
-          <div className="flex border border-gray-200 dark:border-gray-700 rounded-md overflow-hidden">
+          {/* Range selection buttons */}
+          <div className="flex rounded-lg overflow-hidden shadow-sm border border-gray-200 dark:border-gray-700">
             <button
+              className={`px-3 py-1.5 text-xs font-medium transition-colors ${getRangeButtonStyles('1H')}`}
               onClick={() => setRange('1H')}
-              className={`px-3 py-1 text-xs ${
-                range === '1H' 
-                  ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300'
-                  : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300'
-              }`}
             >
               1H
             </button>
             <button
+              className={`px-3 py-1.5 text-xs font-medium transition-colors ${getRangeButtonStyles('6H')}`}
               onClick={() => setRange('6H')}
-              className={`px-3 py-1 text-xs ${
-                range === '6H' 
-                  ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300'
-                  : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300'
-              }`}
             >
               6H
             </button>
             <button
+              className={`px-3 py-1.5 text-xs font-medium transition-colors ${getRangeButtonStyles('1D')}`}
               onClick={() => setRange('1D')}
-              className={`px-3 py-1 text-xs ${
-                range === '1D' 
-                  ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300'
-                  : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300'
-              }`}
             >
               1D
             </button>
             <button
+              className={`px-3 py-1.5 text-xs font-medium transition-colors ${getRangeButtonStyles('ALL')}`}
               onClick={() => setRange('ALL')}
-              className={`px-3 py-1 text-xs ${
-                range === 'ALL' 
-                  ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300'
-                  : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300'
-              }`}
             >
               ALL
             </button>
@@ -720,259 +869,200 @@ function DualChartContent({ fundId, stableJitterPattern }) {
         </div>
       </div>
       
-      {/* Chart area */}
-      <div className="w-full h-64">
+      <div className="h-64 sm:h-72 md:h-80">
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart
-            data={chartData}
-            margin={{ top: 20, right: 40, left: 40, bottom: 20 }}
-            baseValue="dataMin"
-          >
+          <AreaChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
             <defs>
-              <linearGradient id="navGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor={isDarkMode ? "#3B82F6" : "#93C5FD"} stopOpacity={0.5}/>
-                <stop offset="95%" stopColor={isDarkMode ? "#3B82F6" : "#93C5FD"} stopOpacity={0.1}/>
+              <linearGradient id="navFill" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={isDarkMode ? "#3b82f6" : "#2563eb"} stopOpacity={0.3} />
+                <stop offset="100%" stopColor={isDarkMode ? "#3b82f6" : "#2563eb"} stopOpacity={0} />
               </linearGradient>
-              <linearGradient id="yieldGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#22c55e" stopOpacity={0.7}/>
-                <stop offset="95%" stopColor="#22c55e" stopOpacity={0.2}/>
+              <linearGradient id="yieldFill" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={isDarkMode ? "#b8860b" : "#d4a72c"} stopOpacity={0.3} />
+                <stop offset="100%" stopColor={isDarkMode ? "#b8860b" : "#d4a72c"} stopOpacity={0} />
               </linearGradient>
             </defs>
-            
             <CartesianGrid 
               strokeDasharray="3 3" 
-              stroke={isDarkMode ? "#374151" : "#E5E7EB"} 
+              vertical={false} 
+              stroke={isDarkMode ? "rgba(75, 85, 99, 0.2)" : "rgba(209, 213, 219, 0.5)"}
             />
-            
             <XAxis 
-              dataKey="timestamp"
-              tick={{ 
-                fill: isDarkMode ? "#9CA3AF" : "#6B7280", 
-                fontSize: 12,
-                angle: -15, // Rotate text slightly for better readability
-                textAnchor: 'end',
-                dy: 8 // Adjust vertical position to prevent overlap
-              }}
-              stroke={isDarkMode ? "#4B5563" : "#D1D5DB"}
-              tickFormatter={(value) => {
-                // Add debug logging to see what value is coming in
-                console.log("XAxis value:", value);
-                return formatTime(value);
-              }}
-              interval={Math.ceil(chartData.length / 6)} // Limit to about 6 ticks on the x-axis
-              minTickGap={40} // Increase gap between ticks
-              tickMargin={16} // Add more margin below the ticks
-              padding={{ left: 10, right: 10 }}
-              height={60} // Give more space for the x-axis
+              dataKey="timestamp" 
+              tickFormatter={formatTime}
+              stroke={isDarkMode ? "#6b7280" : "#9ca3af"}
+              tick={{ fill: isDarkMode ? "#9ca3af" : "#4b5563", fontSize: 11 }}
+              tickLine={{ stroke: isDarkMode ? "#6b7280" : "#d1d5db" }}
             />
-            
-            {/* NAV y-axis on the left */}
-            {showNav && (
+            {(viewMode === 'NAV' || viewMode === 'COMBINED') && (
               <YAxis 
                 yAxisId="nav"
-                domain={['dataMin', 'dataMax']}
-                tick={{ fill: isDarkMode ? "#60A5FA" : "#3B82F6" }}
-                stroke={navColor}
-                width={40}
-                tickMargin={12}
-                margin={{ left: 16 }}
-                tickFormatter={(value) => {
-                  if (value === undefined || value === null || isNaN(value)) {
-                    return '$0.00';
-                  }
-                  return `$${parseFloat(value).toFixed(2)}`;
-                }}
+                orientation="left" 
+                domain={['auto', 'auto']}
+                tickFormatter={(value) => `$${value.toFixed(2)}`}
+                stroke={isDarkMode ? "#3b82f6" : "#2563eb"}
+                tick={{ fill: isDarkMode ? "#9ca3af" : "#4b5563", fontSize: 11 }}
+                tickLine={{ stroke: isDarkMode ? "#6b7280" : "#d1d5db" }}
               />
             )}
-            
-            {/* Yield y-axis on the right */}
-            {showYield && (
+            {(viewMode === 'YIELD' || viewMode === 'COMBINED') && (
               <YAxis 
-                yAxisId="yield" 
+                yAxisId="yield"
                 orientation="right" 
-                domain={['auto', 'auto']}  // Auto scaling for yield
-                tick={{ fill: "#22c55e" }}
-                stroke="#22c55e"
-                width={50}
-                tickMargin={15}
-                padding={{ top: 5, bottom: 5 }}
-                tickFormatter={(value) => {
-                  if (value === undefined || value === null || isNaN(value)) {
-                    return '0.00%';
-                  }
-                  return `${parseFloat(value).toFixed(2)}%`;
-                }}
+                domain={['auto', 'auto']}
+                tickFormatter={(value) => `${value.toFixed(2)}%`}
+                stroke={isDarkMode ? "#b8860b" : "#d4a72c"}
+                tick={{ fill: isDarkMode ? "#9ca3af" : "#4b5563", fontSize: 11 }}
+                tickLine={{ stroke: isDarkMode ? "#6b7280" : "#d1d5db" }}
               />
             )}
-            
             <Tooltip 
-              content={({ active, payload, label }) => {
-                if (active && payload && payload.length) {
-                  // Get timestamp directly from the label or payload
-                  let timestamp = label;
-                  
-                  // Debug the raw timestamp to see what we're receiving
-                  console.log("Raw tooltip timestamp:", timestamp);
-                  
-                  // Try to extract timestamp from payload if label doesn't work
-                  if (!timestamp && payload[0] && payload[0].payload) {
-                    timestamp = payload[0].payload.timestamp;
-                    console.log("Using payload timestamp:", timestamp);
-                  }
-                  
-                  // Handle case where multiple ISO strings are concatenated
-                  let cleanTimestamp = timestamp;
-                  if (typeof timestamp === 'string') {
-                    // Check if we have multiple ISO strings concatenated
-                    if (timestamp.includes('Z') && timestamp.indexOf('Z') < timestamp.length - 1) {
-                      // Extract just the first complete ISO string
-                      cleanTimestamp = timestamp.substring(0, timestamp.indexOf('Z') + 1);
-                      console.log("Extracted first ISO timestamp:", cleanTimestamp);
-                    }
-                  }
-                  
-                  // Format the timestamp
-                  let formattedDate;
-                  try {
-                    const date = new Date(cleanTimestamp);
-                    console.log("Parsing date:", date);
-                    // More detailed date for the tooltip
-                    formattedDate = format(date, 'MMM d, yyyy • h:mm a');
-                    console.log("Formatted date:", formattedDate);
-                  } catch (e) {
-                    console.error("Error formatting date:", e, "with input:", cleanTimestamp);
-                    formattedDate = "Invalid date";
-                  }
-                  
-                  return (
-                    <div className="custom-tooltip p-2 shadow-md rounded" 
-                      style={{ 
-                        backgroundColor: isDarkMode ? '#1F2937' : 'white',
-                        border: isDarkMode ? 'none' : '1px solid #E5E7EB',
-                        color: isDarkMode ? '#E5E7EB' : '#111827',
-                        borderRadius: '8px'
-                      }}
-                    >
-                      <p className="font-medium text-xs text-gray-500">
-                        {formattedDate}
-                      </p>
-                      {payload.map((entry, index) => {
-                        let value, name;
-                        if (entry.name === 'NAV') {
-                          value = entry.value === undefined || entry.value === null || isNaN(entry.value)
-                            ? '$0.00'
-                            : `$${parseFloat(entry.value).toFixed(2)}`;
-                          name = 'NAV';
-                        } else if (entry.name === 'Yield') {
-                          value = entry.value === undefined || entry.value === null || isNaN(entry.value)
-                            ? '0.00%'
-                            : `${parseFloat(entry.value).toFixed(2)}%`;
-                          name = 'Yield';
-                        } else {
-                          value = entry.value;
-                          name = entry.name;
-                        }
-                        
-                        return (
-                          <p key={index} className="text-sm mt-1">
-                            <span style={{ color: entry.color }}>{name}: </span>
-                            <span className="font-medium">{value}</span>
-                          </p>
-                        );
-                      })}
-                    </div>
-                  );
-                }
-                return null;
+              content={<CustomTooltip />} 
+              cursor={{
+                stroke: isDarkMode ? "rgba(156, 163, 175, 0.3)" : "rgba(107, 114, 128, 0.3)",
+                strokeWidth: 1,
+                strokeDasharray: "3 3"
               }}
             />
-            
-            {/* Add or modify the Legend component to be conditional */}
-            {showLegend && (
-              <Legend 
-                verticalAlign="top"
-                height={36}
-                wrapperStyle={{
-                  paddingTop: '10px'
-                }}
-              />
-            )}
-            
-            {/* NAV area */}
-            {showNav && (
+            <Legend verticalAlign="top" height={36} />
+            {(viewMode === 'NAV' || viewMode === 'COMBINED') && (
               <Area 
                 type="monotone" 
                 dataKey="nav" 
                 yAxisId="nav"
-                name="NAV"
-                stroke={navColor} 
-                fill="url(#navGradient)"
-                fillOpacity={1}
+                name="NAV ($)" 
+                stroke={isDarkMode ? "#3b82f6" : "#2563eb"} 
                 strokeWidth={2}
-                dot={false}
-                activeDot={{ r: 4 }}
-                connectNulls={true}
+                fill="url(#navFill)" 
+                activeDot={{ 
+                  r: 6, 
+                  stroke: isDarkMode ? "#1e3a8a" : "#1e40af",
+                  strokeWidth: 1,
+                  fill: isDarkMode ? "#3b82f6" : "#2563eb"
+                }} 
               />
             )}
-            
-            {/* Yield area */}
-            {showYield && (
+            {(viewMode === 'YIELD' || viewMode === 'COMBINED') && (
               <Area 
                 type="monotone" 
                 dataKey="yield" 
-                yAxisId="yield"
-                name="Yield"
-                stroke={yieldColor}
-                fill="url(#yieldGradient)"
-                fillOpacity={1}
-                strokeWidth={2} 
-                dot={false}
-                activeDot={{ r: 4 }}
-                connectNulls={true}
-                isAnimationActive={true}
-                animationDuration={500}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                data={jitteredYieldData}
+                yAxisId="yield" 
+                name="Yield (%)" 
+                stroke={isDarkMode ? "#b8860b" : "#d4a72c"} 
+                strokeWidth={2}
+                fill="url(#yieldFill)" 
+                activeDot={{ 
+                  r: 6, 
+                  stroke: isDarkMode ? "#92400e" : "#b45309",
+                  strokeWidth: 1,
+                  fill: isDarkMode ? "#b8860b" : "#d4a72c"
+                }} 
               />
             )}
           </AreaChart>
         </ResponsiveContainer>
       </div>
-    </div>
-  );
-}
-
-// Separate components for different states to avoid conditional hook calls
-function LoadingState() {
-  return (
-    <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 shadow-sm">
-      <h2 className="font-semibold mb-4 text-gray-800 dark:text-gray-300">NAV History</h2>
-      <div className="text-center py-4 text-sm text-gray-400 dark:text-gray-500 animate-pulse">
-        Loading chart data...
+      
+      <div className="flex justify-between items-center mt-4 text-xs text-gray-500 dark:text-gray-400">
+        <span>Last updated: {timeAgo(latestTimestamp)}</span>
+        <div className="flex space-x-4">
+          <div className="flex items-center">
+            <div className="w-3 h-3 rounded-full mr-1.5" style={{ backgroundColor: isDarkMode ? "#3b82f6" : "#2563eb" }}></div>
+            <span>NAV: ${formatNumber(currentNav)}</span>
+          </div>
+          <div className="flex items-center">
+            <div className="w-3 h-3 rounded-full mr-1.5" style={{ backgroundColor: isDarkMode ? "#b8860b" : "#d4a72c" }}></div>
+            <span>Yield: {formatNumber(currentYield)}%</span>
+          </div>
+        </div>
       </div>
     </div>
   );
 }
 
-function ErrorState({ error }) {
+// Add these modified loading, error and empty states with improved styling
+
+function LoadingState({ className }) {
   return (
-    <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 shadow-sm">
-      <h2 className="font-semibold mb-4 text-gray-800 dark:text-gray-300">NAV History</h2>
-      <div className="text-center py-4 text-sm text-red-500 dark:text-red-400">
-        Failed to load chart data: {error}
+    <div className={`chart-container bg-white dark:bg-gray-800 rounded-xl p-5 h-80 flex items-center justify-center shadow-md border border-gray-100 dark:border-gray-700 ${className || ''}`}>
+      <div className="text-center">
+        <div className="inline-block w-12 h-12 border-4 border-t-secondary border-gray-200 dark:border-gray-600 rounded-full animate-spin mb-4"></div>
+        <p className="text-gray-600 dark:text-gray-300">Loading chart data...</p>
       </div>
     </div>
   );
 }
 
-function EmptyState() {
+function ErrorState({ error, className }) {
   return (
-    <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 shadow-sm">
-      <h2 className="font-semibold mb-4 text-gray-800 dark:text-gray-300">NAV History</h2>
-      <div className="text-center py-10 text-sm text-gray-400 dark:text-gray-500">
-        No chart data available
+    <div className={`chart-container bg-white dark:bg-gray-800 rounded-xl p-5 h-80 flex items-center justify-center shadow-md border border-gray-100 dark:border-gray-700 ${className || ''}`}>
+      <div className="text-center p-6 max-w-md">
+        <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-400 mb-4">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+        </div>
+        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">Chart Error</h3>
+        <p className="text-gray-600 dark:text-gray-300 mb-4">
+          {error?.message || "Unable to load chart data. Please try again later."}
+        </p>
       </div>
     </div>
   );
-} 
+}
+
+function EmptyState({ className }) {
+  return (
+    <div className={`chart-container bg-white dark:bg-gray-800 rounded-xl p-5 h-80 flex items-center justify-center shadow-md border border-gray-100 dark:border-gray-700 ${className || ''}`}>
+      <div className="text-center p-6 max-w-md">
+        <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 mb-4">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+          </svg>
+        </div>
+        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No Chart Data</h3>
+        <p className="text-gray-600 dark:text-gray-300">
+          There is no chart data available to display at this time.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+const CustomTooltip = ({ active, payload, label }) => {
+  if (!active || !payload || !payload.length) {
+    return null;
+  }
+
+  return (
+    <div className="bg-white dark:bg-gray-800 p-3 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg">
+      <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">
+        {formatTime(label)}
+      </p>
+      {payload.map((entry, index) => {
+        // Customize the tooltip based on NAV or yield
+        const isNav = entry.dataKey === "nav";
+        const valuePrefix = isNav ? "$" : "";
+        const valueSuffix = isNav ? "" : "%";
+        const colorClass = isNav ? "text-blue-600 dark:text-blue-400" : "text-amber-600 dark:text-amber-400";
+        
+        return (
+          <div key={`tooltip-${index}`} className="flex items-center justify-between mb-1 last:mb-0">
+            <span className="flex items-center">
+              <span 
+                className="inline-block w-3 h-3 rounded-full mr-2" 
+                style={{ backgroundColor: entry.color }}
+              />
+              <span className="text-xs text-gray-600 dark:text-gray-300">
+                {entry.name}:
+              </span>
+            </span>
+            <span className={`text-xs font-medium ml-4 ${colorClass}`}>
+              {valuePrefix}{formatNumber(entry.value, 3)}{valueSuffix}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}; 

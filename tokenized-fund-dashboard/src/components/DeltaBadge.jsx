@@ -36,14 +36,19 @@ const ArrowDownRight = () => (
 );
 
 export default function DeltaBadge({ delta }) {
-  // For null or undefined values, default to a small positive value
-  if (delta == null || isNaN(delta)) delta = 0.01;
+  // For null or undefined values, default to zero
+  if (delta == null || isNaN(delta)) delta = 0;
   
-  // Ensure very small values still show as at least 0.01%
-  if (Math.abs(delta) < 0.01) delta = 0.01 * (delta >= 0 ? 1 : -1);
-
+  // Don't force minimum value - show actual percentage
   const isPositive = delta >= 0;
   const formatted = Math.abs(delta).toFixed(2);
+
+  // Debug the delta value
+  console.log('[DEBUG] DeltaBadge received delta:', {
+    rawDelta: delta,
+    isPositive,
+    formatted: formatted + '%'
+  });
 
   return (
     <span

@@ -1,123 +1,158 @@
-import { useState } from 'react';
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
-import { gql, useQuery } from '@apollo/client';
+import React, { useState, useEffect } from 'react';
 
-const YIELD_HISTORY = gql`
-  query GetYieldHistory($fundId: ID!) {
-    yieldHistory(fundId: $fundId) {
-      timestamp
-      yield
-    }
+// Mock data generator for yield history
+const generateMockYieldData = (days = 30) => {
+  const data = [];
+  const today = new Date();
+  const baseYield = 3 + Math.random() * 2; // Start around 3-5%
+  
+  for (let i = days; i >= 0; i--) {
+    const date = new Date(today);
+    date.setDate(date.getDate() - i);
+    
+    // Create some realistic yield movements
+    const volatility = 0.1; // % daily movement
+    const changePercent = (Math.random() * volatility * 2) - volatility;
+    const yieldValue = i === days ? 
+      baseYield : 
+      data[data.length-1].value * (1 + (changePercent / 100));
+    
+    data.push({
+      date: date.toISOString().split('T')[0],
+      value: parseFloat(yieldValue.toFixed(2))
+    });
   }
-`;
-
-// Helper function for consistent time formatting
-const formatTime = (timestamp) => {
-  return new Intl.DateTimeFormat([], {
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(new Date(timestamp));
+  
+  return data;
 };
 
-export default function YieldChart({ fundId }) {
-  const [range, setRange] = useState('ALL');
-  const { data, loading, error } = useQuery(YIELD_HISTORY, {
-    variables: { fundId },
-    pollInterval: 15000, // 🕒 updates every 15 seconds
-  });
-
-  if (loading) return <div className="text-center py-4 text-sm text-gray-400 dark:text-gray-500 animate-pulse">Loading yield data...</div>;
-  if (error) return <p className="text-sm text-red-500 dark:text-red-400">Failed to load yield history</p>;
-
-  const history = data?.yieldHistory || [];
+const YieldChart = ({ fundId }) => {
+  const [yieldData, setYieldData] = useState([]);
+  const [loading, setLoading] = useState(true);
   
-  // Sort history by timestamp to ensure correct order
-  const sortedHistory = [...history].sort((a, b) => 
-    new Date(a.timestamp) - new Date(b.timestamp)
-  );
+  useEffect(() => {
+    // In a real app, this would fetch data from your GraphQL API
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        // Simulate API call
+        await new Promise(resolve => setTimeout(resolve, 800));
+        const mockData = generateMockYieldData();
+        setYieldData(mockData);
+      } catch (error) {
+        console.error('Error fetching yield data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchData();
+  }, [fundId]);
   
-  // Filter data based on selected range
-  const now = Date.now();
-  let filtered = sortedHistory;
-
-  if (range === '1H') filtered = sortedHistory.filter(d => new Date(d.timestamp) > new Date(now - 3600000));
-  if (range === '6H') filtered = sortedHistory.filter(d => new Date(d.timestamp) > new Date(now - 6 * 3600000));
-  if (range === '1D') filtered = sortedHistory.filter(d => new Date(d.timestamp) > new Date(now - 24 * 3600000));
-
-  // Calculate yield line color based on average yield value
-  const avgYield = filtered.length > 0 
-    ? filtered.reduce((sum, item) => sum + item.yield, 0) / filtered.length
-    : 0;
+  if (loading) {
+    return (
+      <div className="h-64 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-amber-500"></div>
+      </div>
+    );
+  }
   
-  const lineColor = avgYield >= 0 ? "#16a34a" : "#dc2626"; // Green for positive, red for negative
-
-  // Detect dark mode for chart colors
-  const isDarkMode = document.documentElement.classList.contains('dark');
-  const gridColor = isDarkMode ? '#374151' : '#f0f0f0';
-  const tickColor = isDarkMode ? '#9ca3af' : '#6b7280';
-  const axisColor = isDarkMode ? '#4b5563' : '#e5e7eb';
-
+  // Get min and max for scaling
+  const values = yieldData.map(d => d.value);
+  const min = Math.min(...values) * 0.95; // Add some padding
+  const max = Math.max(...values) * 1.05;
+  const range = max - min;
+  
+  // Calculate stats
+  const latestValue = yieldData[yieldData.length - 1]?.value || 0;
+  const oldestValue = yieldData[0]?.value || 0;
+  const changeValue = latestValue - oldestValue;
+  const changePercent = oldestValue ? (changeValue / oldestValue) * 100 : 0;
+  const isPositive = changeValue >= 0;
+  
+  // Generate weekly averages
+  const weeklyAverages = [];
+  const weeks = Math.ceil(yieldData.length / 7);
+  
+  for (let i = 0; i < weeks; i++) {
+    const start = i * 7;
+    const end = Math.min((i + 1) * 7, yieldData.length);
+    const weekData = yieldData.slice(start, end);
+    
+    if (weekData.length > 0) {
+      const sum = weekData.reduce((acc, item) => acc + item.value, 0);
+      const avg = sum / weekData.length;
+      weeklyAverages.push({
+        week: `Week ${weeks - i}`,
+        average: avg
+      });
+    }
+  }
+  
   return (
-    <div className="mt-4">
-      <div className="flex justify-between items-center mb-1">
-        <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">Yield History</h3>
-        <div className="flex gap-1">
-          {['1H', '6H', '1D', 'ALL'].map((r) => (
-            <button
-              key={r}
-              onClick={() => setRange(r)}
-              className={`text-xs px-2 py-1 rounded border ${range === r 
-                ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 border-blue-300 dark:border-blue-700' 
-                : 'text-gray-500 dark:text-gray-400 border-gray-200 dark:border-gray-700'}`}
-            >
-              {r}
-            </button>
-          ))}
+    <div>
+      <div className="flex justify-between items-center mb-4">
+        <div>
+          <span className="text-xs text-gray-500 dark:text-gray-400">30-Day Average: {(values.reduce((a, b) => a + b, 0) / values.length).toFixed(2)}%</span>
+        </div>
+        <div className="text-right">
+          <span className={`text-xs font-medium ${isPositive ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+            {isPositive ? '+' : ''}{changePercent.toFixed(2)}% ({isPositive ? '+' : ''}{changeValue.toFixed(2)}%)
+          </span>
         </div>
       </div>
-      <div className="h-40 sm:h-48 border border-gray-100 dark:border-gray-700 rounded-lg p-2 bg-white dark:bg-gray-800">
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart 
-            data={filtered}
-            margin={{ top: 10, right: 5, left: 0, bottom: 0 }}
-          >
-            <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
-            <XAxis 
-              dataKey="timestamp" 
-              tickFormatter={formatTime}
-              tick={{ fontSize: 10, fill: tickColor }}
-              stroke={axisColor}
-              minTickGap={15}
-            />
-            <YAxis 
-              domain={['auto', 'auto']} 
-              tick={{ fontSize: 10, fill: tickColor }}
-              stroke={axisColor}
-              width={38}
-              tickFormatter={(value) => `${value.toFixed(2)}%`}
-            />
-            <Tooltip 
-              labelFormatter={formatTime}
-              formatter={(value) => [`${value.toFixed(2)}%`, 'Yield']}
-              contentStyle={{ 
-                borderRadius: '6px', 
-                border: isDarkMode ? '1px solid #374151' : '1px solid #e5e7eb',
-                boxShadow: '0 2px 5px rgba(0,0,0,0.1)',
-                backgroundColor: isDarkMode ? '#1f2937' : 'white',
-                color: isDarkMode ? '#e5e7eb' : 'inherit'
-              }}
-            />
-            <Line 
-              type="monotone" 
-              dataKey="yield" 
-              stroke={lineColor} 
-              strokeWidth={2} 
-              dot={false} 
-              activeDot={{ r: 5, stroke: lineColor, strokeWidth: 1, fill: lineColor }}
-            />
-          </LineChart>
-        </ResponsiveContainer>
+      
+      <div className="relative h-40">
+        {/* Chart background */}
+        <div className="absolute inset-0 bg-gray-50 dark:bg-gray-800 rounded overflow-hidden">
+          <div className="h-full flex items-end">
+            {yieldData.map((point, index) => {
+              const height = ((point.value - min) / range) * 100;
+              return (
+                <div
+                  key={index}
+                  className="flex-1 flex justify-center items-end h-full"
+                >
+                  <div
+                    className={`w-full max-w-[8px] rounded-t ${
+                      point.value > oldestValue
+                        ? 'bg-yellow-500 dark:bg-yellow-400'
+                        : 'bg-orange-500 dark:bg-orange-400'
+                    }`}
+                    style={{ height: `${height}%`, minHeight: '1px' }}
+                    title={`${point.date}: ${point.value}%`}
+                  ></div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+      
+      <div className="mt-2 text-center">
+        <div className="text-2xl font-bold text-gray-900 dark:text-white">
+          {latestValue.toFixed(2)}%
+        </div>
+        <div className="text-xs text-gray-500 dark:text-gray-400">
+          Current Yield
+        </div>
+      </div>
+      
+      {/* Weekly averages */}
+      <div className="mt-4 flex justify-between">
+        {weeklyAverages.slice(0, 4).reverse().map((week, index) => (
+          <div key={index} className="text-center">
+            <div className="text-xs font-medium text-gray-500 dark:text-gray-400">
+              {week.week}
+            </div>
+            <div className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+              {week.average.toFixed(2)}%
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
-} 
+};
+
+export default YieldChart; 

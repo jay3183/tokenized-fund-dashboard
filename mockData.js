@@ -147,7 +147,7 @@ for (let i = 0; i <= 288; i++) {
   YIELD_DATA.push({ timestamp: timestamp.toISOString(), yield: parseFloat(yieldPct.toFixed(3)) });
 }
 
-const users = [
+export const users = [
   {
     id: "I1",
     name: "Jason",
@@ -160,7 +160,7 @@ const users = [
   },
 ];
 
-const funds = [
+export const funds = [
   {
     id: "F1",
     name: "OnChain Growth Fund",
@@ -174,7 +174,7 @@ const funds = [
   },
 ];
 
-const auditLogs = [
+export const auditLogs = [
   {
     id: "AL1",
     actor: "system",
@@ -272,6 +272,4 @@ const auditLogs = [
     metadata: { previousYield: 4.50, newYield: 4.52 }
   }
 ];
-
-module.exports = { users, funds, auditLogs };
   

@@ -40,3 +40,232 @@
 .read-the-docs {
   color: #888;
 }
+
+:root {
+  /* Elite color palette */
+  --primary: #152238;    /* Dark navy */
+  --primary-dark: #0c1526;
+  --primary-light: #233252;
+  --secondary: #b8860b;  /* Gold/amber */
+  --secondary-light: #d4a72c;
+  --secondary-dark: #96690a;
+  --text-primary: #f0f4f8;
+  --text-secondary: #d0d5dd;
+  --background: #f8fafc;
+  --card-bg: #ffffff;
+  --card-bg-dark: #1c2333; 
+  --gray-light: #e9ecef;
+  --gray-medium: #adb5bd;
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --info: #3b82f6;
+}
+
+body {
+  font-family: 'Inter', 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif;
+  background-color: var(--background);
+  color: #1a202c;
+  line-height: 1.5;
+  transition: background-color 0.3s, color 0.3s;
+}
+
+body.dark {
+  background-color: #0f172a;
+  color: var(--text-primary);
+}
+
+/* Elegant card styling */
+.card {
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
+  transition: all 0.3s ease;
+  overflow: hidden;
+  border: 1px solid rgba(229, 231, 235, 0.5);
+  background-color: var(--card-bg);
+}
+
+.card:hover {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  transform: translateY(-2px);
+}
+
+.dark .card {
+  background-color: var(--card-bg-dark);
+  border-color: rgba(45, 55, 72, 0.6);
+}
+
+/* Premium buttons */
+.btn-primary {
+  background-color: var(--primary);
+  color: white;
+  border-radius: 8px;
+  padding: 0.75rem 1.5rem;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  border: none;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.btn-primary:hover {
+  background-color: var(--primary-dark);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.btn-secondary {
+  background-color: transparent;
+  color: var(--primary);
+  border: 1.5px solid var(--primary);
+  border-radius: 8px;
+  padding: 0.75rem 1.5rem;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.btn-secondary:hover {
+  background-color: rgba(21, 34, 56, 0.05);
+}
+
+.dark .btn-secondary {
+  color: var(--text-primary);
+  border-color: var(--text-secondary);
+}
+
+/* Fancy header underline animation */
+.nav-link {
+  position: relative;
+  padding-bottom: 0.25rem;
+}
+
+.nav-link::after {
+  content: '';
+  position: absolute;
+  width: 0;
+  height: 2px;
+  bottom: 0;
+  left: 0;
+  background-color: var(--secondary);
+  transition: width 0.3s ease;
+}
+
+.nav-link:hover::after,
+.nav-link.active::after {
+  width: 100%;
+}
+
+/* Gold accents for important elements */
+.gold-accent {
+  color: var(--secondary);
+}
+
+.dark .gold-accent {
+  color: var(--secondary-light);
+}
+
+/* Charts and data visualization */
+.chart-container {
+  border-radius: 12px;
+  padding: 1.5rem;
+  background-color: var(--card-bg);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+}
+
+.dark .chart-container {
+  background-color: var(--card-bg-dark);
+}
+
+/* Premium gradient elements */
+.premium-gradient {
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+  color: white;
+}
+
+.gold-gradient {
+  background: linear-gradient(135deg, var(--secondary-dark) 0%, var(--secondary) 100%);
+  color: white;
+}
+
+/* Typography */
+h1, h2, h3, h4, h5, h6 {
+  font-weight: 600;
+  line-height: 1.2;
+  margin-bottom: 1rem;
+}
+
+h1 {
+  font-size: 2.25rem;
+  letter-spacing: -0.025em;
+}
+
+h2 {
+  font-size: 1.875rem;
+  letter-spacing: -0.025em;
+}
+
+h3 {
+  font-size: 1.5rem;
+}
+
+.section-title {
+  position: relative;
+  display: inline-block;
+  margin-bottom: 1.5rem;
+}
+
+.section-title::after {
+  content: '';
+  position: absolute;
+  width: 40px;
+  height: 3px;
+  background-color: var(--secondary);
+  left: 0;
+  bottom: -0.5rem;
+}
+
+/* Loading animation */
+.loading-skeleton {
+  animation: pulse 1.5s infinite;
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  border-radius: 4px;
+}
+
+@keyframes pulse {
+  0% {
+    background-position: 0% 0%;
+  }
+  100% {
+    background-position: -200% 0%;
+  }
+}
+
+/* Custom scrollbar for premium feel */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(241, 245, 249, 0.8);
+}
+
+::-webkit-scrollbar-thumb {
+  background: #94a3b8;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
+.dark ::-webkit-scrollbar-track {
+  background: rgba(30, 41, 59, 0.8);
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #475569;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}

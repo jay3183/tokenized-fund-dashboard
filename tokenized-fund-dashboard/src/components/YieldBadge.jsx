@@ -1,8 +1,11 @@
 import React from 'react';
 
 export default function YieldBadge({ value, className = "" }) {
-  // Handle null or undefined values
-  const safeValue = value == null ? 0 : value;
+  // Handle null, undefined, or non-numeric values
+  const safeValue = typeof value === 'number' && !isNaN(value) 
+    ? value 
+    : (value && !isNaN(parseFloat(value)) ? parseFloat(value) : 0);
+  
   const isPositive = safeValue >= 0;
   
   return (

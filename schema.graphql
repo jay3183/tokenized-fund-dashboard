@@ -3,6 +3,8 @@ scalar JSON
 type User {
   id: ID!
   name: String!
+  email: String
+  role: String
   holdings: [Holding!]!
 }
 
@@ -19,8 +21,10 @@ type Fund {
   chainId: String!
   assetType: String!
   currentNav: Float!
+  previousNav: Float!
   intradayYield: Float!
   yieldHistory: [YieldHistory!]!
+  yieldSnapshots: [YieldSnapshot!]!
   inceptionDate: String
   auditLogs: [AuditLog!] 
   currentNAV: NAVSnapshot
@@ -33,6 +37,14 @@ type Fund {
 type YieldHistory {
   timestamp: String!
   yield: Float!
+}
+
+type YieldSnapshot {
+  id: ID!
+  fundId: ID!
+  yield: Float!
+  timestamp: String!
+  source: String!
 }
 
 type NAVSnapshot {
@@ -48,6 +60,7 @@ type Portfolio {
   investorId: ID!
   fundId: ID!
   shares: Float!
+  fund: Fund
 }
 
 type AuditLog {
@@ -77,21 +90,57 @@ type YieldWithdrawalResult {
   timestamp: String!
 }
 
+# Dashboard metrics for admin dashboard
+type DashboardMetrics {
+  totalAum: Float!
+  activeFunds: Int!
+  activeInvestors: Int!
+  averageYield: Float!
+}
+
+# System status for admin dashboard
+type SystemStatus {
+  dbConnected: Boolean!
+  chainlinkResponding: Boolean!
+  yieldUpdaterRunning: Boolean!
+}
+
+# Authentication types
+type AuthPayload {
+  token: String!
+  user: User!
+}
+
 type Query {
   user(id: ID!): User
   fund(id: ID!): Fund
+  # Retrieves a list of all available funds
+  # Returns null or empty array if no funds exist
   allFunds: [Fund!]
   navHistory(fundId: ID!): [NAVSnapshot!]!
   yieldHistory(fundId: ID!): [YieldHistory!]!
+  yieldSnapshots(fundId: ID!): [YieldSnapshot!]!
   portfolio(investorId: ID!, fundId: ID!): Portfolio
   auditLogs(fundId: ID!): [AuditLog!]!
+  # Current user query
+  me: User
+  # Dashboard metrics for admin
+  dashboardMetrics: DashboardMetrics!
+  # Recent activity logs for admin
+  recentAdminActivity: [AuditLog!]!
+  # System status information
+  systemStatus: SystemStatus!
 }
 
 type Mutation {
+  # Authentication mutations
+  login(email: String!, password: String!): AuthPayload!
+  
+  # Fund management mutations
   updateNAV(input: UpdateNAVInput!): NAVSnapshot!
   mintShares(input: MintSharesInput!): MintResult!
   redeemShares(input: RedeemSharesInput!): RedeemResult!
-  withdrawYield(investorId: ID!, fundId: ID!): YieldWithdrawalResult!
+  withdrawYield(input: WithdrawYieldInput!): YieldWithdrawalResult!
 }
 
 input UpdateNAVInput {
@@ -110,4 +159,9 @@ input RedeemSharesInput {
   fundId: ID!
   investorId: ID!
   shares: Float!
+}
+
+input WithdrawYieldInput {
+  fundId: ID!
+  investorId: ID!
 }

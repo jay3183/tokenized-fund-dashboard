@@ -1,21 +1,97 @@
 import { createContext, useState, useContext, useEffect } from 'react';
+import jwtDecode from 'jwt-decode';
 
-export const RoleContext = createContext();
+export const AuthContext = createContext();
 
-export function RoleProvider({ children }) {
-  // Get initial role from localStorage or default to 'INVESTOR'
-  const [role, setRole] = useState(() => localStorage.getItem('role') || 'INVESTOR');
-  
-  // Save role to localStorage whenever it changes
+export function AuthProvider({ children }) {
+  // Initialize auth state from localStorage
+  const [authState, setAuthState] = useState(() => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      try {
+        const decoded = jwtDecode(token);
+        // Check if token is expired
+        if (decoded.exp * 1000 < Date.now()) {
+          localStorage.removeItem('token');
+          return { isAuthenticated: false, user: null, role: 'GUEST' };
+        }
+        return {
+          isAuthenticated: true,
+          user: {
+            id: decoded.id,
+            name: decoded.name,
+            email: decoded.email,
+            role: decoded.role,
+          },
+          role: decoded.role,
+        };
+      } catch (error) {
+        console.error('Error decoding token:', error);
+        localStorage.removeItem('token');
+        return { isAuthenticated: false, user: null, role: 'GUEST' };
+      }
+    }
+    return { isAuthenticated: false, user: null, role: 'GUEST' };
+  });
+
+  // Login function
+  const login = (token, user) => {
+    localStorage.setItem('token', token);
+    localStorage.setItem('userId', user.id);
+    localStorage.setItem('role', user.role);
+    setAuthState({
+      isAuthenticated: true,
+      user,
+      role: user.role,
+    });
+  };
+
+  // Logout function
+  const logout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('userId');
+    localStorage.removeItem('role');
+    setAuthState({
+      isAuthenticated: false,
+      user: null,
+      role: 'GUEST',
+    });
+  };
+
+  // Check if token is still valid on page refresh/load
   useEffect(() => {
-    localStorage.setItem('role', role);
-  }, [role]);
-  
+    const token = localStorage.getItem('token');
+    if (token) {
+      try {
+        const decoded = jwtDecode(token);
+        if (decoded.exp * 1000 < Date.now()) {
+          logout();
+        }
+      } catch (error) {
+        logout();
+      }
+    }
+  }, []);
+
   return (
-    <RoleContext.Provider value={{ role, setRole }}>
+    <AuthContext.Provider 
+      value={{ 
+        ...authState, 
+        login, 
+        logout,
+        setRole: (role) => setAuthState(prev => ({ ...prev, role })),
+      }}
+    >
       {children}
-    </RoleContext.Provider>
+    </AuthContext.Provider>
   );
 }
 
-export const useRole = () => useContext(RoleContext); 
+// For backward compatibility
+export const RoleContext = AuthContext;
+export const RoleProvider = AuthProvider;
+export const useAuth = () => useContext(AuthContext);
+export const useRole = () => {
+  const auth = useContext(AuthContext);
+  return { role: auth.role, setRole: auth.setRole };
+}; 

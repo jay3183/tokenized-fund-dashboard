@@ -1,9 +1,20 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Tokenized Fund Dashboard</title>
+    <title>Franklin Templeton Dashboard</title>
+    <script>
+      // Immediately set theme based on saved preference to prevent flash
+      (function() {
+        const darkMode = localStorage.getItem('darkMode');
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        
+        if (darkMode === 'false' || (!darkMode && !prefersDark)) {
+          document.documentElement.classList.remove('dark');
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
