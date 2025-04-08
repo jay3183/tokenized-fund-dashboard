@@ -93,6 +93,7 @@ cp .env.example .env
 
 4. Initialize your database:
 ```
+Run the following from the **project root**, where your `prisma/` folder is located:
 npx prisma migrate dev
 npx prisma db seed
 ```
