@@ -44,7 +44,7 @@ This project combines the world of traditional finance with blockchain technolog
 ### What You'll Need
 - Node.js (v16+)
 - npm or yarn
-- PostgreSQL database
+- SQLite or PostgreSQL
 
 ### Setup in 5 Easy Steps
 
