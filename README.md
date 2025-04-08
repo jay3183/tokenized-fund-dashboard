@@ -105,6 +105,7 @@ Backend:
 (GraphQL + Prisma)
 From the **project root**, start the backend server:
 npm run dev
+This runs the GraphQL API on `http://localhost:4000/graphql` by default.
 ```
 
 Frontend:
