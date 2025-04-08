@@ -2,14 +2,35 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+  :focus {
+    outline: none;
+  }
+  
+  :focus-visible {
+    outline: none;
+    @apply ring-2 ring-amber-300/50 ring-offset-1 ring-offset-transparent;
+  }
+  
+  a:focus-visible {
+    @apply ring-2 ring-white/50 rounded-md;
+  }
+}
+
 html {
   transition: background-color 0.3s, color 0.3s;
+  scroll-behavior: smooth;
 }
 
 :root {
   font-family: "Helvetica Neue", Helvetica, Inter, system-ui, Avenir, Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;
+  --primary: #00205B;
+  --primary-dark: #001745;
+  --primary-light: #1e3a8a;
+  --secondary: #f4b400;
+  --secondary-light: #ffd54f;
 }
 
 body {
@@ -20,13 +41,14 @@ body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  @apply transition-colors duration-200;
+  color: #1a202c; /* Ensure text is dark for light mode */
 }
 
 /* Global focus styles - remove all focus indicators */
 *:focus {
-  outline: none !important;
-  box-shadow: none !important;
-  border-color: transparent !important;
+  outline: 2px solid var(--secondary);
+  outline-offset: 2px;
 }
 
 /* Specifically target the theme toggle */
@@ -51,7 +73,7 @@ div[role="button"]:active {
   box-shadow: none !important;
 }
 
-/* Global transition effects for dark mode */
+/* Global transition effects */
 @layer base {
   * {
     @apply transition-colors duration-200 ease-in-out;
@@ -62,6 +84,44 @@ div[role="button"]:active {
 @layer utilities {
   .text-balance {
     text-wrap: balance;
+  }
+  
+  /* Override any dark mode classes */
+  .dark\:bg-gray-800 {
+    background-color: #ffffff !important;
+  }
+  
+  .dark\:text-white {
+    color: #1a202c !important;
+  }
+  
+  .dark\:bg-gray-700 {
+    background-color: #ffffff !important;
+  }
+  
+  .dark\:border-gray-700 {
+    border-color: #e2e8f0 !important;
+  }
+  
+  /* Additional dark overrides */
+  .dark {
+    background-color: #ffffff !important;
+    color: #1a202c !important;
+  }
+  
+  .dark .bg-gray-800,
+  .dark .bg-gray-900 {
+    background-color: #ffffff !important;
+  }
+  
+  .dark .text-white,
+  .dark .text-gray-100 {
+    color: #1a202c !important;
+  }
+  
+  .dark .border-gray-700,
+  .dark .border-gray-800 {
+    border-color: #e2e8f0 !important;
   }
 }
 
@@ -134,4 +194,53 @@ div[role="button"]:active {
   50% {
     opacity: 0.5;
   }
+}
+
+/* Add subtle fade-in animation for content */
+.fade-in {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Improve card appearance */
+.card {
+  @apply bg-white rounded-lg shadow-md transition-shadow duration-300;
+}
+
+.card:hover {
+  @apply shadow-lg;
+}
+
+/* Smooth transitions for interactive elements */
+button, a {
+  transition: all 0.2s ease;
+}
+
+/* Custom scrollbar for a more polished look */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+/* Form element styling */
+input, select, textarea {
+  @apply border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500;
 }

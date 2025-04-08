@@ -75,8 +75,8 @@ export default function DualChart({ fundId, navHistory, yieldHistory, currentNav
   // Return early if not authenticated
   if (!isAuthenticated || !userId) {
     return (
-      <div className={`bg-white dark:bg-gray-800 rounded-xl p-4 h-72 w-full shadow-md border border-gray-100 dark:border-gray-700 ${className || ''}`}>
-        <p className="text-center text-gray-500 dark:text-gray-400">Please log in to view charts</p>
+      <div className={`bg-white rounded-xl p-4 h-72 w-full shadow-md border border-gray-100 ${className || ''}`}>
+        <p className="text-center text-gray-500">Please log in to view charts</p>
       </div>
     );
   }
@@ -110,23 +110,9 @@ function DualChartContent({ fundId, navHistory: propNavHistory, yieldHistory: pr
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [latestTimestamp, setLatestTimestamp] = useState(new Date().toISOString());
 
-  // Check for dark mode
+  // Remove dark mode checking since we're standardizing on light mode
   useEffect(() => {
-    const checkDarkMode = () => {
-      setIsDarkMode(document.documentElement.classList.contains('dark'));
-    };
-    
-    // Check on mount
-    checkDarkMode();
-    
-    // Set up mutation observer to watch for class changes on html element
-    const observer = new MutationObserver(checkDarkMode);
-    observer.observe(document.documentElement, { 
-      attributes: true, 
-      attributeFilter: ['class'] 
-    });
-    
-    return () => observer.disconnect();
+    setIsDarkMode(false); // Always use light mode
   }, []);
 
   // Only fetch from API if we don't have props data
@@ -775,26 +761,26 @@ function DualChartContent({ fundId, navHistory: propNavHistory, yieldHistory: pr
     const yieldMax = Math.max(...yieldValues) * 1.02;
     
     // Color definitions
-    const navColor = isDarkMode ? '#3B82F6' : '#2563EB';
+    const navColor = '#3B82F6';
     const yieldColor = '#10B981';
     
     return {
       navMin, navMax, yieldMin, yieldMax,
       navColor, yieldColor
     };
-  }, [chartData, isDarkMode]);
+  }, [chartData]);
 
   // New custom styles for range buttons
   const getRangeButtonStyles = (buttonRange) => {
     return buttonRange === range
       ? 'bg-secondary text-white border-secondary shadow-md'
-      : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700';
+      : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50';
   };
 
   const getViewButtonStyles = (buttonView) => {
     return buttonView === viewMode
       ? 'bg-primary text-white border-primary shadow-md'
-      : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700';
+      : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50';
   };
 
   if (loading) {
@@ -811,14 +797,14 @@ function DualChartContent({ fundId, navHistory: propNavHistory, yieldHistory: pr
 
   // Modified to use custom styles and more elegant design
   return (
-    <div className={`chart-container bg-white dark:bg-gray-800 rounded-xl p-5 shadow-md border border-gray-100 dark:border-gray-700 ${className || ''}`}>
+    <div className={`chart-container bg-white rounded-xl p-5 shadow-md border border-gray-100 ${className || ''}`}>
       <div className="flex justify-between items-center mb-6">
-        <h3 className="text-base font-semibold text-gray-800 dark:text-white">
+        <h3 className="text-base font-semibold text-gray-800">
           <span className="gold-accent">Performance</span> Overview
         </h3>
         <div className="flex space-x-2">
           {/* View mode toggles */}
-          <div className="flex rounded-lg overflow-hidden shadow-sm border border-gray-200 dark:border-gray-700">
+          <div className="flex rounded-lg overflow-hidden shadow-sm border border-gray-200">
             <button
               className={`px-3 py-1.5 text-xs font-medium transition-colors ${getViewButtonStyles('NAV')}`}
               onClick={() => setViewMode('NAV')}
@@ -840,7 +826,7 @@ function DualChartContent({ fundId, navHistory: propNavHistory, yieldHistory: pr
           </div>
           
           {/* Range selection buttons */}
-          <div className="flex rounded-lg overflow-hidden shadow-sm border border-gray-200 dark:border-gray-700">
+          <div className="flex rounded-lg overflow-hidden shadow-sm border border-gray-200">
             <button
               className={`px-3 py-1.5 text-xs font-medium transition-colors ${getRangeButtonStyles('1H')}`}
               onClick={() => setRange('1H')}
@@ -874,35 +860,35 @@ function DualChartContent({ fundId, navHistory: propNavHistory, yieldHistory: pr
           <AreaChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
             <defs>
               <linearGradient id="navFill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={isDarkMode ? "#3b82f6" : "#2563eb"} stopOpacity={0.3} />
-                <stop offset="100%" stopColor={isDarkMode ? "#3b82f6" : "#2563eb"} stopOpacity={0} />
+                <stop offset="0%" stopColor={seriesData.navColor} stopOpacity={0.3} />
+                <stop offset="100%" stopColor={seriesData.navColor} stopOpacity={0} />
               </linearGradient>
               <linearGradient id="yieldFill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={isDarkMode ? "#b8860b" : "#d4a72c"} stopOpacity={0.3} />
-                <stop offset="100%" stopColor={isDarkMode ? "#b8860b" : "#d4a72c"} stopOpacity={0} />
+                <stop offset="0%" stopColor={seriesData.yieldColor} stopOpacity={0.3} />
+                <stop offset="100%" stopColor={seriesData.yieldColor} stopOpacity={0} />
               </linearGradient>
             </defs>
             <CartesianGrid 
               strokeDasharray="3 3" 
               vertical={false} 
-              stroke={isDarkMode ? "rgba(75, 85, 99, 0.2)" : "rgba(209, 213, 219, 0.5)"}
+              stroke="rgba(209, 213, 219, 0.5)"
             />
             <XAxis 
               dataKey="timestamp" 
               tickFormatter={formatTime}
-              stroke={isDarkMode ? "#6b7280" : "#9ca3af"}
-              tick={{ fill: isDarkMode ? "#9ca3af" : "#4b5563", fontSize: 11 }}
-              tickLine={{ stroke: isDarkMode ? "#6b7280" : "#d1d5db" }}
+              stroke="#6b7280"
+              tick={{ fill: "#9ca3af", fontSize: 11 }}
+              tickLine={{ stroke: "#d1d5db" }}
             />
             {(viewMode === 'NAV' || viewMode === 'COMBINED') && (
               <YAxis 
                 yAxisId="nav"
                 orientation="left" 
-                domain={['auto', 'auto']}
+                domain={getNavDomain()}
                 tickFormatter={(value) => `$${value.toFixed(2)}`}
-                stroke={isDarkMode ? "#3b82f6" : "#2563eb"}
-                tick={{ fill: isDarkMode ? "#9ca3af" : "#4b5563", fontSize: 11 }}
-                tickLine={{ stroke: isDarkMode ? "#6b7280" : "#d1d5db" }}
+                stroke={seriesData.navColor}
+                tick={{ fill: "#9ca3af", fontSize: 11 }}
+                tickLine={{ stroke: "#d1d5db" }}
               />
             )}
             {(viewMode === 'YIELD' || viewMode === 'COMBINED') && (
@@ -911,15 +897,15 @@ function DualChartContent({ fundId, navHistory: propNavHistory, yieldHistory: pr
                 orientation="right" 
                 domain={['auto', 'auto']}
                 tickFormatter={(value) => `${value.toFixed(2)}%`}
-                stroke={isDarkMode ? "#b8860b" : "#d4a72c"}
-                tick={{ fill: isDarkMode ? "#9ca3af" : "#4b5563", fontSize: 11 }}
-                tickLine={{ stroke: isDarkMode ? "#6b7280" : "#d1d5db" }}
+                stroke={seriesData.yieldColor}
+                tick={{ fill: "#9ca3af", fontSize: 11 }}
+                tickLine={{ stroke: "#d1d5db" }}
               />
             )}
             <Tooltip 
               content={<CustomTooltip />} 
               cursor={{
-                stroke: isDarkMode ? "rgba(156, 163, 175, 0.3)" : "rgba(107, 114, 128, 0.3)",
+                stroke: "rgba(107, 114, 128, 0.3)",
                 strokeWidth: 1,
                 strokeDasharray: "3 3"
               }}
@@ -931,14 +917,14 @@ function DualChartContent({ fundId, navHistory: propNavHistory, yieldHistory: pr
                 dataKey="nav" 
                 yAxisId="nav"
                 name="NAV ($)" 
-                stroke={isDarkMode ? "#3b82f6" : "#2563eb"} 
+                stroke={seriesData.navColor} 
                 strokeWidth={2}
                 fill="url(#navFill)" 
                 activeDot={{ 
                   r: 6, 
-                  stroke: isDarkMode ? "#1e3a8a" : "#1e40af",
+                  stroke: seriesData.navColor,
                   strokeWidth: 1,
-                  fill: isDarkMode ? "#3b82f6" : "#2563eb"
+                  fill: seriesData.navColor
                 }} 
               />
             )}
@@ -948,14 +934,14 @@ function DualChartContent({ fundId, navHistory: propNavHistory, yieldHistory: pr
                 dataKey="yield" 
                 yAxisId="yield" 
                 name="Yield (%)" 
-                stroke={isDarkMode ? "#b8860b" : "#d4a72c"} 
+                stroke={seriesData.yieldColor} 
                 strokeWidth={2}
                 fill="url(#yieldFill)" 
                 activeDot={{ 
                   r: 6, 
-                  stroke: isDarkMode ? "#92400e" : "#b45309",
+                  stroke: seriesData.yieldColor,
                   strokeWidth: 1,
-                  fill: isDarkMode ? "#b8860b" : "#d4a72c"
+                  fill: seriesData.yieldColor
                 }} 
               />
             )}
@@ -963,15 +949,15 @@ function DualChartContent({ fundId, navHistory: propNavHistory, yieldHistory: pr
         </ResponsiveContainer>
       </div>
       
-      <div className="flex justify-between items-center mt-4 text-xs text-gray-500 dark:text-gray-400">
+      <div className="flex justify-between items-center mt-4 text-xs text-gray-500">
         <span>Last updated: {timeAgo(latestTimestamp)}</span>
         <div className="flex space-x-4">
           <div className="flex items-center">
-            <div className="w-3 h-3 rounded-full mr-1.5" style={{ backgroundColor: isDarkMode ? "#3b82f6" : "#2563eb" }}></div>
+            <div className="w-3 h-3 rounded-full mr-1.5" style={{ backgroundColor: seriesData.navColor }}></div>
             <span>NAV: ${formatNumber(currentNav)}</span>
           </div>
           <div className="flex items-center">
-            <div className="w-3 h-3 rounded-full mr-1.5" style={{ backgroundColor: isDarkMode ? "#b8860b" : "#d4a72c" }}></div>
+            <div className="w-3 h-3 rounded-full mr-1.5" style={{ backgroundColor: seriesData.yieldColor }}></div>
             <span>Yield: {formatNumber(currentYield)}%</span>
           </div>
         </div>
@@ -984,10 +970,10 @@ function DualChartContent({ fundId, navHistory: propNavHistory, yieldHistory: pr
 
 function LoadingState({ className }) {
   return (
-    <div className={`chart-container bg-white dark:bg-gray-800 rounded-xl p-5 h-80 flex items-center justify-center shadow-md border border-gray-100 dark:border-gray-700 ${className || ''}`}>
+    <div className={`chart-container bg-white rounded-xl p-5 h-80 flex items-center justify-center shadow-md border border-gray-100 ${className || ''}`}>
       <div className="text-center">
-        <div className="inline-block w-12 h-12 border-4 border-t-secondary border-gray-200 dark:border-gray-600 rounded-full animate-spin mb-4"></div>
-        <p className="text-gray-600 dark:text-gray-300">Loading chart data...</p>
+        <div className="inline-block w-12 h-12 border-4 border-t-secondary border-gray-200 rounded-full animate-spin mb-4"></div>
+        <p className="text-gray-600">Loading chart data...</p>
       </div>
     </div>
   );
@@ -995,15 +981,15 @@ function LoadingState({ className }) {
 
 function ErrorState({ error, className }) {
   return (
-    <div className={`chart-container bg-white dark:bg-gray-800 rounded-xl p-5 h-80 flex items-center justify-center shadow-md border border-gray-100 dark:border-gray-700 ${className || ''}`}>
+    <div className={`chart-container bg-white rounded-xl p-5 h-80 flex items-center justify-center shadow-md border border-gray-100 ${className || ''}`}>
       <div className="text-center p-6 max-w-md">
-        <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-400 mb-4">
+        <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-red-100 text-red-600 mb-4">
           <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
           </svg>
         </div>
-        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">Chart Error</h3>
-        <p className="text-gray-600 dark:text-gray-300 mb-4">
+        <h3 className="text-lg font-medium text-gray-900 mb-2">Chart Error</h3>
+        <p className="text-gray-600 mb-4">
           {error?.message || "Unable to load chart data. Please try again later."}
         </p>
       </div>
@@ -1013,15 +999,15 @@ function ErrorState({ error, className }) {
 
 function EmptyState({ className }) {
   return (
-    <div className={`chart-container bg-white dark:bg-gray-800 rounded-xl p-5 h-80 flex items-center justify-center shadow-md border border-gray-100 dark:border-gray-700 ${className || ''}`}>
+    <div className={`chart-container bg-white rounded-xl p-5 h-80 flex items-center justify-center shadow-md border border-gray-100 ${className || ''}`}>
       <div className="text-center p-6 max-w-md">
-        <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 mb-4">
+        <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-gray-100 text-gray-500 mb-4">
           <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
           </svg>
         </div>
-        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No Chart Data</h3>
-        <p className="text-gray-600 dark:text-gray-300">
+        <h3 className="text-lg font-medium text-gray-900 mb-2">No Chart Data</h3>
+        <p className="text-gray-600">
           There is no chart data available to display at this time.
         </p>
       </div>
@@ -1035,8 +1021,8 @@ const CustomTooltip = ({ active, payload, label }) => {
   }
 
   return (
-    <div className="bg-white dark:bg-gray-800 p-3 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg">
-      <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">
+    <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-lg">
+      <p className="text-xs font-medium text-gray-500 mb-2">
         {formatTime(label)}
       </p>
       {payload.map((entry, index) => {
@@ -1044,7 +1030,7 @@ const CustomTooltip = ({ active, payload, label }) => {
         const isNav = entry.dataKey === "nav";
         const valuePrefix = isNav ? "$" : "";
         const valueSuffix = isNav ? "" : "%";
-        const colorClass = isNav ? "text-blue-600 dark:text-blue-400" : "text-amber-600 dark:text-amber-400";
+        const colorClass = isNav ? "text-blue-600" : "text-amber-600";
         
         return (
           <div key={`tooltip-${index}`} className="flex items-center justify-between mb-1 last:mb-0">
@@ -1053,7 +1039,7 @@ const CustomTooltip = ({ active, payload, label }) => {
                 className="inline-block w-3 h-3 rounded-full mr-2" 
                 style={{ backgroundColor: entry.color }}
               />
-              <span className="text-xs text-gray-600 dark:text-gray-300">
+              <span className="text-xs text-gray-600">
                 {entry.name}:
               </span>
             </span>

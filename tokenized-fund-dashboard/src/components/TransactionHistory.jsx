@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { formatCurrency } from '../utils/formatters';
+import { useQuery } from '@apollo/client';
+import { GET_USER_TRANSACTIONS } from '../graphql/queries';
+import { useAuth } from '../contexts/AuthContext';
 
-// Mock transaction data
+// Mock transaction data for fallback
 const MOCK_TRANSACTIONS = [
   {
     id: 't1',
@@ -111,6 +114,7 @@ const TRANSACTION_TYPES = {
 };
 
 export default function TransactionHistory() {
+  const { user } = useAuth();
   const [transactions, setTransactions] = useState([]);
   const [filteredTransactions, setFilteredTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -118,52 +122,130 @@ export default function TransactionHistory() {
   const [filter, setFilter] = useState('ALL');
   const [dateRange, setDateRange] = useState({ from: '', to: '' });
   const [isDownloading, setIsDownloading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState(null);
   
   const transactionsPerPage = 6;
   
-  // Fetch transactions data
-  useEffect(() => {
-    // Simulate API call
-    const fetchTransactions = async () => {
-      try {
-        setLoading(true);
-        // Simulate network delay
-        await new Promise(resolve => setTimeout(resolve, 800));
+  // Fetch transaction data from GraphQL API with retry logic
+  const { data, loading: queryLoading, error, refetch } = useQuery(GET_USER_TRANSACTIONS, {
+    variables: { userId: user?.id || 'guest' },
+    skip: !user?.id,
+    fetchPolicy: 'network-only',
+    errorPolicy: 'all',
+    notifyOnNetworkStatusChange: true,
+    onError: (error) => {
+      console.error('Error in GET_USER_TRANSACTIONS query:', error);
+      
+      // Fall back to mock data on network error
+      if (error.networkError) {
+        console.error('Network error details:', error.networkError);
+        setErrorMessage('NetworkError when attempting to fetch resource. Using sample data instead.');
         setTransactions(MOCK_TRANSACTIONS);
-      } catch (error) {
-        console.error('Error fetching transactions:', error);
-      } finally {
+        setLoading(false);
+      } else if (error.graphQLErrors) {
+        console.error('GraphQL errors:', error.graphQLErrors);
+        setErrorMessage(`GraphQL error: ${error.graphQLErrors[0]?.message || 'Unknown error'}`);
+        setTransactions(MOCK_TRANSACTIONS);
         setLoading(false);
       }
-    };
-    
-    fetchTransactions();
-  }, []);
+    }
+  });
+  
+  // Set transactions when data is loaded
+  useEffect(() => {
+    if (data?.userTransactions) {
+      console.log('Transactions loaded from API:', data.userTransactions);
+      setTransactions(data.userTransactions);
+      setLoading(false);
+      setErrorMessage(null);
+    } else if (error) {
+      console.error('Error loading transactions:', error);
+      // Fall back to mock data in case of error
+      setTransactions(MOCK_TRANSACTIONS);
+      setLoading(false);
+    } else if (queryLoading) {
+      setLoading(true);
+    } else if (!user?.id) {
+      // If no user, use mock data
+      console.log('No user found, using mock data');
+      setTransactions(MOCK_TRANSACTIONS);
+      setLoading(false);
+    }
+  }, [data, queryLoading, error, user?.id]);
+  
+  // Add retry mechanism for failed queries
+  useEffect(() => {
+    if (error && error.networkError) {
+      const timer = setTimeout(() => {
+        console.log('Retrying transaction query...');
+        refetch()
+          .then(() => {
+            console.log('Transaction query retry successful');
+            setErrorMessage(null);
+          })
+          .catch(e => {
+            console.error('Retry failed:', e);
+            setErrorMessage('NetworkError when attempting to fetch resource. Using sample data instead.');
+          });
+      }, 3000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [error, refetch]);
   
   // Apply filters
   useEffect(() => {
-    // Apply type filter
-    let result = transactions;
-    
-    if (filter !== 'ALL') {
-      result = result.filter(t => t.type === filter);
+    try {
+      // Apply type filter
+      let result = [...transactions];
+      
+      if (filter !== 'ALL') {
+        result = result.filter(t => t.type === filter);
+      }
+      
+      // Apply date range filter - with error handling for invalid dates
+      if (dateRange.from) {
+        try {
+          const fromDate = new Date(dateRange.from);
+          if (!isNaN(fromDate.getTime())) {
+            result = result.filter(t => {
+              try {
+                return new Date(t.date) >= fromDate;
+              } catch (e) {
+                return true; // Include transaction if date parsing fails
+              }
+            });
+          }
+        } catch (e) {
+          console.warn("Invalid from date", e);
+        }
+      }
+      
+      if (dateRange.to) {
+        try {
+          const toDate = new Date(dateRange.to);
+          // Set to end of day
+          toDate.setHours(23, 59, 59, 999);
+          if (!isNaN(toDate.getTime())) {
+            result = result.filter(t => {
+              try {
+                return new Date(t.date) <= toDate;
+              } catch (e) {
+                return true; // Include transaction if date parsing fails
+              }
+            });
+          }
+        } catch (e) {
+          console.warn("Invalid to date", e);
+        }
+      }
+      
+      setFilteredTransactions(result);
+      setCurrentPage(1);
+    } catch (error) {
+      console.error("Error filtering transactions:", error);
+      setFilteredTransactions(transactions); // Fall back to unfiltered
     }
-    
-    // Apply date range filter
-    if (dateRange.from) {
-      const fromDate = new Date(dateRange.from);
-      result = result.filter(t => new Date(t.date) >= fromDate);
-    }
-    
-    if (dateRange.to) {
-      const toDate = new Date(dateRange.to);
-      // Set to end of day
-      toDate.setHours(23, 59, 59, 999);
-      result = result.filter(t => new Date(t.date) <= toDate);
-    }
-    
-    setFilteredTransactions(result);
-    setCurrentPage(1);
   }, [transactions, filter, dateRange]);
   
   // Get current page transactions
@@ -202,20 +284,20 @@ export default function TransactionHistory() {
     
     switch (type) {
       case 'MINT':
-        bgClass = 'bg-blue-100 dark:bg-blue-900/30';
-        textClass = 'text-blue-800 dark:text-blue-300';
+        bgClass = 'bg-blue-100';
+        textClass = 'text-blue-800';
         break;
       case 'REDEEM':
-        bgClass = 'bg-amber-100 dark:bg-amber-900/30';
-        textClass = 'text-amber-800 dark:text-amber-300';
+        bgClass = 'bg-amber-100';
+        textClass = 'text-amber-800';
         break;
       case 'YIELD_PAYMENT':
-        bgClass = 'bg-green-100 dark:bg-green-900/30';
-        textClass = 'text-green-800 dark:text-green-300';
+        bgClass = 'bg-green-100';
+        textClass = 'text-green-800';
         break;
       default:
-        bgClass = 'bg-gray-100 dark:bg-gray-800';
-        textClass = 'text-gray-800 dark:text-gray-300';
+        bgClass = 'bg-gray-100';
+        textClass = 'text-gray-800';
     }
     
     return (
@@ -225,19 +307,19 @@ export default function TransactionHistory() {
     );
   };
   
-  // Empty state
-  if (!loading && filteredTransactions.length === 0) {
+  // Empty state - show either no transactions or error message
+  if (!loading && (filteredTransactions.length === 0 || errorMessage)) {
     return (
-      <div className="card bg-white dark:bg-gray-800 shadow-md p-6 rounded-xl">
+      <div className="card bg-white shadow-md p-6 rounded-xl">
         <div className="flex justify-between items-center mb-6">
-          <h3 className="text-base font-semibold text-gray-900 dark:text-white">
+          <h3 className="text-base font-semibold text-gray-900">
             <span className="gold-accent">Transaction</span> History
           </h3>
           <div className="flex space-x-3">
             <select 
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
-              className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-secondary dark:focus:ring-secondary"
+              className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-secondary"
             >
               <option value="ALL">All Types</option>
               <option value="MINT">Mints</option>
@@ -248,25 +330,39 @@ export default function TransactionHistory() {
         </div>
         
         <div className="flex flex-col items-center justify-center p-8 text-center">
-          <div className="rounded-full bg-gray-100 dark:bg-gray-700 p-3 mb-4">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-gray-400 dark:text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <div className="rounded-full bg-gray-100 p-3 mb-4">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
             </svg>
           </div>
-          <h3 className="text-gray-700 dark:text-gray-300 font-medium mb-1">No transactions found</h3>
-          <p className="text-gray-500 dark:text-gray-400 text-sm max-w-sm">
-            There are no transactions matching your current filter criteria. Try changing the filters or check back later.
+          <h3 className="text-gray-700 font-medium mb-1">
+            {errorMessage ? "Connection Issue" : "No transactions found"}
+          </h3>
+          <p className="text-gray-500 text-sm max-w-sm">
+            {errorMessage
+              ? "We're having trouble connecting to the server. Showing sample data instead."
+              : "There are no transactions matching your current filter criteria. Try changing the filters or check back later."}
           </p>
+          {errorMessage && (
+            <div className="mt-4">
+              <button 
+                onClick={() => refetch().catch(e => console.error('Manual retry failed:', e))} 
+                className="px-3 py-1.5 text-sm rounded-lg bg-primary text-white hover:bg-primary-dark"
+              >
+                Retry Connection
+              </button>
+            </div>
+          )}
         </div>
       </div>
     );
   }
   
   return (
-    <div className="card bg-white dark:bg-gray-800 shadow-md rounded-xl">
+    <div className="card bg-white shadow-md rounded-xl">
       <div className="p-6">
         <div className="flex justify-between items-center mb-6 flex-wrap gap-3">
-          <h3 className="text-base font-semibold text-gray-900 dark:text-white">
+          <h3 className="text-base font-semibold text-gray-900">
             <span className="gold-accent">Transaction</span> History
           </h3>
           
@@ -277,14 +373,14 @@ export default function TransactionHistory() {
                 type="date"
                 value={dateRange.from}
                 onChange={(e) => setDateRange({ ...dateRange, from: e.target.value })}
-                className="px-2 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-secondary dark:focus:ring-secondary"
+                className="px-2 py-1.5 text-sm rounded-lg border border-gray-300 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-secondary"
               />
-              <span className="text-gray-500 dark:text-gray-400">to</span>
+              <span className="text-gray-500">to</span>
               <input 
                 type="date"
                 value={dateRange.to}
                 onChange={(e) => setDateRange({ ...dateRange, to: e.target.value })}
-                className="px-2 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-secondary dark:focus:ring-secondary"
+                className="px-2 py-1.5 text-sm rounded-lg border border-gray-300 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-secondary"
               />
             </div>
             
@@ -292,7 +388,7 @@ export default function TransactionHistory() {
             <select 
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
-              className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-secondary dark:focus:ring-secondary"
+              className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-secondary"
             >
               <option value="ALL">All Types</option>
               <option value="MINT">Mints</option>
@@ -306,7 +402,7 @@ export default function TransactionHistory() {
               disabled={isDownloading || filteredTransactions.length === 0}
               className={`flex items-center px-3 py-1.5 text-sm rounded-lg 
                 ${isDownloading || filteredTransactions.length === 0
-                  ? 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed'
+                  ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
                   : 'bg-primary text-white hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-colors'
                 }`}
             >
@@ -333,21 +429,21 @@ export default function TransactionHistory() {
         {loading ? (
           <div className="animate-pulse space-y-4">
             {[...Array(5)].map((_, i) => (
-              <div key={i} className="flex items-center py-3 border-b border-gray-100 dark:border-gray-700">
+              <div key={i} className="flex items-center py-3 border-b border-gray-100">
                 <div className="w-1/4">
-                  <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
+                  <div className="h-4 bg-gray-200 rounded w-3/4"></div>
                 </div>
                 <div className="w-1/5">
-                  <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
+                  <div className="h-4 bg-gray-200 rounded w-1/2"></div>
                 </div>
                 <div className="w-1/4">
-                  <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-4/5"></div>
+                  <div className="h-4 bg-gray-200 rounded w-4/5"></div>
                 </div>
                 <div className="w-1/5">
-                  <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-2/3"></div>
+                  <div className="h-4 bg-gray-200 rounded w-2/3"></div>
                 </div>
                 <div className="w-1/5 text-right">
-                  <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded ml-auto w-1/2"></div>
+                  <div className="h-4 bg-gray-200 rounded ml-auto w-1/2"></div>
                 </div>
               </div>
             ))}
@@ -355,9 +451,9 @@ export default function TransactionHistory() {
         ) : (
           <>
             <div className="overflow-x-auto -mx-4 sm:-mx-0">
-              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+              <table className="min-w-full divide-y divide-gray-200">
                 <thead>
-                  <tr className="text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  <tr className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     <th className="pl-4 sm:pl-6 pr-3 py-3">Date & Time</th>
                     <th className="px-3 py-3">Type</th>
                     <th className="px-3 py-3">Amount</th>
@@ -366,35 +462,35 @@ export default function TransactionHistory() {
                     <th className="px-3 py-3 text-right">Status</th>
                   </tr>
                 </thead>
-                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-100 dark:divide-gray-700">
+                <tbody className="bg-white divide-y divide-gray-100">
                   {currentTransactions.map((transaction) => (
                     <tr 
                       key={transaction.id}
-                      className="hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors text-sm"
+                      className="hover:bg-gray-50 transition-colors text-sm"
                     >
-                      <td className="pl-4 sm:pl-6 pr-3 py-4 text-gray-900 dark:text-white whitespace-nowrap">
+                      <td className="pl-4 sm:pl-6 pr-3 py-4 text-gray-900 whitespace-nowrap">
                         <div>{format(new Date(transaction.date), 'MMM d, yyyy')}</div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400">{format(new Date(transaction.date), 'h:mm a')}</div>
+                        <div className="text-xs text-gray-500">{format(new Date(transaction.date), 'h:mm a')}</div>
                       </td>
                       <td className="px-3 py-4 whitespace-nowrap">
                         <TransactionTypeBadge type={transaction.type} />
                       </td>
-                      <td className="px-3 py-4 text-gray-900 dark:text-white whitespace-nowrap font-medium">
+                      <td className="px-3 py-4 text-gray-900 whitespace-nowrap font-medium">
                         {formatCurrency(transaction.amount)}
                       </td>
-                      <td className="px-3 py-4 text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                      <td className="px-3 py-4 text-gray-500 whitespace-nowrap">
                         {transaction.shares ? transaction.shares.toFixed(4) : '-'}
                       </td>
-                      <td className="px-3 py-4 text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                      <td className="px-3 py-4 text-gray-500 whitespace-nowrap">
                         {transaction.navPrice ? formatCurrency(transaction.navPrice) : '-'}
                       </td>
                       <td className="px-3 py-4 whitespace-nowrap text-right">
                         <span className={`px-2 py-1 text-xs rounded-full 
                           ${transaction.status === 'CONFIRMED'
-                            ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
+                            ? 'bg-green-100 text-green-800'
                             : transaction.status === 'PENDING'
-                              ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300'
-                              : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
+                              ? 'bg-yellow-100 text-yellow-800'
+                              : 'bg-red-100 text-red-800'
                           }`}
                         >
                           {transaction.status}
@@ -409,7 +505,7 @@ export default function TransactionHistory() {
             {/* Pagination */}
             {totalPages > 1 && (
               <div className="mt-6 flex items-center justify-between">
-                <div className="text-sm text-gray-500 dark:text-gray-400">
+                <div className="text-sm text-gray-500">
                   Showing {indexOfFirstTransaction + 1} to {Math.min(indexOfLastTransaction, filteredTransactions.length)} of {filteredTransactions.length} transactions
                 </div>
                 
@@ -419,8 +515,8 @@ export default function TransactionHistory() {
                     disabled={currentPage === 1}
                     className={`px-3 py-1 rounded text-sm font-medium 
                       ${currentPage === 1
-                        ? 'text-gray-400 dark:text-gray-600 cursor-not-allowed'
-                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                        ? 'text-gray-400 cursor-not-allowed'
+                        : 'text-gray-700 hover:bg-gray-100'
                       }`}
                   >
                     Previous
@@ -433,7 +529,7 @@ export default function TransactionHistory() {
                       className={`px-3 py-1 rounded text-sm font-medium 
                         ${currentPage === i + 1
                           ? 'bg-primary text-white'
-                          : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                          : 'text-gray-700 hover:bg-gray-100'
                         }`}
                     >
                       {i + 1}
@@ -445,8 +541,8 @@ export default function TransactionHistory() {
                     disabled={currentPage === totalPages}
                     className={`px-3 py-1 rounded text-sm font-medium 
                       ${currentPage === totalPages
-                        ? 'text-gray-400 dark:text-gray-600 cursor-not-allowed'
-                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                        ? 'text-gray-400 cursor-not-allowed'
+                        : 'text-gray-700 hover:bg-gray-100'
                       }`}
                   >
                     Next

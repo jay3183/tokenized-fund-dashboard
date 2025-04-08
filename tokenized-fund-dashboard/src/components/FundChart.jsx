@@ -171,12 +171,12 @@ const FundChart = ({ fundId, type = 'nav' }) => {
   const range = max - min;
   
   return (
-    <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow">
+    <div className="bg-white p-4 rounded-xl shadow">
       <div className="flex justify-between items-center mb-4">
-        <h3 className="font-semibold text-slate-800 dark:text-white">
+        <h3 className="font-semibold text-slate-800">
           {type === 'nav' ? 'NAV History' : 'Yield History'}
         </h3>
-        <div className="text-xs text-slate-500 dark:text-slate-400">
+        <div className="text-xs text-slate-500">
           Last updated {secondsAgo} seconds ago
         </div>
       </div>
@@ -190,7 +190,7 @@ const FundChart = ({ fundId, type = 'nav' }) => {
               className={`px-3 py-1 text-xs rounded-md ${
                 timeRange === range
                   ? 'bg-primary text-white'
-                  : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
+                  : 'bg-slate-100 text-slate-600'
               }`}
             >
               {range}
@@ -199,7 +199,7 @@ const FundChart = ({ fundId, type = 'nav' }) => {
         </div>
         <button
           onClick={() => refetch()}
-          className="text-xs text-primary dark:text-blue-400 hover:underline"
+          className="text-xs text-primary hover:underline"
         >
           Refresh
         </button>
@@ -207,12 +207,12 @@ const FundChart = ({ fundId, type = 'nav' }) => {
       
       <div className="flex justify-between items-center mb-2">
         <div>
-          <span className="text-xs text-slate-500 dark:text-slate-400">
+          <span className="text-xs text-slate-500">
             Starting: {type === 'nav' ? '$' : ''}{oldestValue.toFixed(2)}{type === 'yield' ? '%' : ''}
           </span>
         </div>
         <div className="text-right">
-          <span className={`text-xs font-medium ${isPositive ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+          <span className={`text-xs font-medium ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
             {isPositive ? '+' : ''}{changePercent.toFixed(2)}% ({isPositive ? '+' : ''}
             {type === 'nav' ? '$' : ''}{changeValue.toFixed(2)}{type === 'yield' ? '%' : ''})
           </span>
@@ -221,7 +221,7 @@ const FundChart = ({ fundId, type = 'nav' }) => {
       
       <div className="relative h-40">
         {/* Chart background */}
-        <div className="absolute inset-0 bg-slate-50 dark:bg-slate-700/50 rounded overflow-hidden">
+        <div className="absolute inset-0 bg-slate-50 rounded overflow-hidden">
           <div className="h-full flex items-end">
             {chartData.map((point, index) => {
               const height = ((point.value - min) / range) * 100;
@@ -233,8 +233,8 @@ const FundChart = ({ fundId, type = 'nav' }) => {
                   <div
                     className={`w-full max-w-[8px] rounded-t ${
                       point.value > oldestValue
-                        ? type === 'nav' ? 'bg-primary dark:bg-blue-400' : 'bg-amber-500 dark:bg-amber-400'
-                        : 'bg-red-500 dark:bg-red-400'
+                        ? type === 'nav' ? 'bg-primary' : 'bg-amber-500'
+                        : 'bg-red-500'
                     }`}
                     style={{ height: `${height}%`, minHeight: '1px' }}
                     title={`${point.date.toLocaleDateString()}: ${type === 'nav' ? '$' : ''}${point.value.toFixed(2)}${type === 'yield' ? '%' : ''}`}
@@ -246,10 +246,10 @@ const FundChart = ({ fundId, type = 'nav' }) => {
           
           {/* Value line */}
           <div 
-            className="absolute left-0 right-0 border-t border-dashed border-slate-300 dark:border-slate-600"
+            className="absolute left-0 right-0 border-t border-dashed border-slate-300"
             style={{ top: `${((max - oldestValue) / range) * 100}%` }}
           >
-            <span className="absolute right-0 -top-3 text-xs text-slate-500 dark:text-slate-400 px-1">
+            <span className="absolute right-0 -top-3 text-xs text-slate-500 px-1">
               Start: {type === 'nav' ? '$' : ''}{oldestValue.toFixed(2)}{type === 'yield' ? '%' : ''}
             </span>
           </div>
@@ -257,7 +257,7 @@ const FundChart = ({ fundId, type = 'nav' }) => {
       </div>
       
       <div className="mt-4 text-center">
-        <div className="text-2xl font-bold text-slate-900 dark:text-white">
+        <div className="text-2xl font-bold text-slate-900">
           {type === 'nav' ? '$' : ''}
           <CountUp 
             end={latestValue} 
@@ -268,7 +268,7 @@ const FundChart = ({ fundId, type = 'nav' }) => {
           />
           {type === 'yield' ? '%' : ''}
         </div>
-        <div className="text-xs text-slate-500 dark:text-slate-400">
+        <div className="text-xs text-slate-500">
           Current {type === 'nav' ? 'NAV' : 'Yield'}
         </div>
       </div>

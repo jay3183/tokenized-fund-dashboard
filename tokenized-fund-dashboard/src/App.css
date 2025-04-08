@@ -42,18 +42,16 @@
 }
 
 :root {
-  /* Elite color palette */
-  --primary: #152238;    /* Dark navy */
-  --primary-dark: #0c1526;
-  --primary-light: #233252;
-  --secondary: #b8860b;  /* Gold/amber */
-  --secondary-light: #d4a72c;
-  --secondary-dark: #96690a;
-  --text-primary: #f0f4f8;
-  --text-secondary: #d0d5dd;
+  --primary: #00205B;    /* Franklin Templeton blue */
+  --primary-dark: #001745;
+  --primary-light: #1e3a8a;
+  --secondary: #f4b400;  /* Gold */
+  --secondary-light: #ffd54f;
+  --secondary-dark: #c7940c;
+  --text-primary: #1a202c;
+  --text-secondary: #4a5568;
   --background: #f8fafc;
   --card-bg: #ffffff;
-  --card-bg-dark: #1c2333; 
   --gray-light: #e9ecef;
   --gray-medium: #adb5bd;
   --success: #10b981;
@@ -67,12 +65,6 @@ body {
   background-color: var(--background);
   color: #1a202c;
   line-height: 1.5;
-  transition: background-color 0.3s, color 0.3s;
-}
-
-body.dark {
-  background-color: #0f172a;
-  color: var(--text-primary);
 }
 
 /* Elegant card styling */
@@ -82,17 +74,13 @@ body.dark {
   transition: all 0.3s ease;
   overflow: hidden;
   border: 1px solid rgba(229, 231, 235, 0.5);
-  background-color: var(--card-bg);
+  background-color: #ffffff;
+  color: #1a202c;
 }
 
 .card:hover {
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
   transform: translateY(-2px);
-}
-
-.dark .card {
-  background-color: var(--card-bg-dark);
-  border-color: rgba(45, 55, 72, 0.6);
 }
 
 /* Premium buttons */
@@ -108,7 +96,7 @@ body.dark {
 }
 
 .btn-primary:hover {
-  background-color: var(--primary-dark);
+  background-color: var(--primary-light);
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 }
 
@@ -123,12 +111,7 @@ body.dark {
 }
 
 .btn-secondary:hover {
-  background-color: rgba(21, 34, 56, 0.05);
-}
-
-.dark .btn-secondary {
-  color: var(--text-primary);
-  border-color: var(--text-secondary);
+  background-color: rgba(0, 32, 91, 0.05);
 }
 
 /* Fancy header underline animation */
@@ -158,20 +141,12 @@ body.dark {
   color: var(--secondary);
 }
 
-.dark .gold-accent {
-  color: var(--secondary-light);
-}
-
 /* Charts and data visualization */
 .chart-container {
   border-radius: 12px;
   padding: 1.5rem;
-  background-color: var(--card-bg);
+  background-color: #ffffff;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
-}
-
-.dark .chart-container {
-  background-color: var(--card-bg-dark);
 }
 
 /* Premium gradient elements */
@@ -181,7 +156,7 @@ body.dark {
 }
 
 .gold-gradient {
-  background: linear-gradient(135deg, var(--secondary-dark) 0%, var(--secondary) 100%);
+  background: linear-gradient(135deg, var(--secondary) 0%, var(--secondary-light) 100%);
   color: white;
 }
 
@@ -190,6 +165,7 @@ h1, h2, h3, h4, h5, h6 {
   font-weight: 600;
   line-height: 1.2;
   margin-bottom: 1rem;
+  color: #1a202c;
 }
 
 h1 {
@@ -255,17 +231,5 @@ h3 {
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #64748b;
-}
-
-.dark ::-webkit-scrollbar-track {
-  background: rgba(30, 41, 59, 0.8);
-}
-
-.dark ::-webkit-scrollbar-thumb {
-  background: #475569;
-}
-
-.dark ::-webkit-scrollbar-thumb:hover {
   background: #64748b;
 }

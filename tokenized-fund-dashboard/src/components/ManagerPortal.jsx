@@ -123,17 +123,17 @@ const ManagerPortal = () => {
     console.log('[ManagerPortal] Funds array:', funds);
   }, [data, loading, error, funds, manuallyFetchedFunds]);
   
-  // Dark mode executive theme styles
-  const containerClasses = "bg-gray-900 text-gray-100 min-h-screen";
-  const headerClasses = "bg-gray-800 border-b border-gray-700 mb-6 p-4";
-  const cardClasses = "bg-gray-800 border border-gray-700 rounded-lg shadow-xl p-4 mb-4";
+  // Light mode styling for executive theme
+  const containerClasses = "bg-gray-50 text-gray-900 min-h-screen";
+  const headerClasses = "bg-white border-b border-gray-200 mb-6 p-4";
+  const cardClasses = "bg-white border border-gray-200 rounded-lg shadow-md p-4 mb-4";
   const tabClasses = "px-4 py-2 font-medium rounded-t-lg";
-  const activeTabClasses = "bg-gray-800 text-blue-400 border-t border-l border-r border-gray-700";
-  const inactiveTabClasses = "bg-gray-900 text-gray-400 hover:text-gray-200";
+  const activeTabClasses = "bg-white text-blue-600 border-t border-l border-r border-gray-200";
+  const inactiveTabClasses = "bg-gray-100 text-gray-600 hover:text-gray-800";
   const buttonClasses = "bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded";
   const dangerButtonClasses = "bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded";
   const metricClasses = "text-3xl font-bold mb-1";
-  const labelClasses = "text-gray-400 text-sm";
+  const labelClasses = "text-gray-500 text-sm";
 
   // Placeholder for status data
   const systemStatus = {
@@ -219,7 +219,7 @@ const ManagerPortal = () => {
 
       <div className="p-6">
         {/* Navigation Tabs */}
-        <div className="border-b border-gray-700 mb-6">
+        <div className="border-b border-gray-200 mb-6">
           <nav className="flex space-x-2 overflow-x-auto pb-1">
             <button 
               className={`${tabClasses} ${activeTab === 'dashboard' ? activeTabClasses : inactiveTabClasses}`}
@@ -352,7 +352,7 @@ const ManagerPortal = () => {
                   <div className="flex justify-between items-center mb-3">
                     <h3 className="text-lg font-semibold">Recent Team Activity</h3>
                     <button 
-                      className="text-sm text-blue-400 hover:text-blue-300"
+                      className="text-sm text-blue-600 hover:text-blue-800"
                       onClick={() => setActiveTab('teamActivity')}
                     >
                       View All
@@ -360,14 +360,14 @@ const ManagerPortal = () => {
                   </div>
                   <div className="space-y-2">
                     {teamActivity.slice(0, 3).map(activity => (
-                      <div key={activity.id} className="flex justify-between items-center p-2 bg-gray-700/50 rounded-lg">
+                      <div key={activity.id} className="flex justify-between items-center p-2 bg-gray-100 rounded-lg">
                         <div>
                           <div className="font-medium">{activity.action}</div>
-                          <div className="text-xs text-gray-400">
+                          <div className="text-xs text-gray-500">
                             {activity.user} • {activity.fundName}
                           </div>
                         </div>
-                        <div className="text-xs text-gray-400">
+                        <div className="text-xs text-gray-500">
                           {timeAgo(activity.timestamp)}
                         </div>
                       </div>
@@ -399,21 +399,21 @@ const ManagerPortal = () => {
                 <div className={`${cardClasses}`}>
                   <div className="space-y-3">
                     {teamActivity.map(activity => (
-                      <div key={activity.id} className="flex justify-between items-center p-3 bg-gray-700/50 rounded-lg border border-gray-700">
+                      <div key={activity.id} className="flex justify-between items-center p-3 bg-gray-100 rounded-lg border border-gray-200">
                         <div className="flex items-center space-x-3">
-                          <div className="h-10 w-10 rounded-full bg-blue-500/20 flex items-center justify-center">
-                            <span className="font-semibold">{activity.user.charAt(0)}</span>
+                          <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
+                            <span className="font-semibold text-blue-800">{activity.user.charAt(0)}</span>
                           </div>
                           <div>
                             <div className="font-medium">{activity.action}</div>
-                            <div className="text-sm text-gray-400">
+                            <div className="text-sm text-gray-500">
                               {activity.user} • {activity.fundName}
                             </div>
                           </div>
                         </div>
                         <div className="text-right">
                           <div className="text-sm">{timeAgo(activity.timestamp)}</div>
-                          <div className="text-xs text-gray-400">{new Date(activity.timestamp).toLocaleString()}</div>
+                          <div className="text-xs text-gray-500">{new Date(activity.timestamp).toLocaleString()}</div>
                         </div>
                       </div>
                     ))}
@@ -430,7 +430,7 @@ const ManagerPortal = () => {
                   <h3 className="text-lg font-medium mb-3">ETL Process Status</h3>
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
-                      <thead className="text-gray-400 border-b border-gray-700">
+                      <thead className="text-gray-600 border-b border-gray-200">
                         <tr>
                           <th className="px-4 py-2 text-left">Process</th>
                           <th className="px-4 py-2 text-left">Status</th>
@@ -440,11 +440,11 @@ const ManagerPortal = () => {
                           <th className="px-4 py-2 text-left">Actions</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-700">
+                      <tbody className="divide-y divide-gray-200">
                         <tr>
                           <td className="px-4 py-3">NAV Data Import</td>
                           <td className="px-4 py-3">
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                               Completed
                             </span>
                           </td>
@@ -452,14 +452,14 @@ const ManagerPortal = () => {
                           <td className="px-4 py-3">in 1 hour</td>
                           <td className="px-4 py-3">1m 45s</td>
                           <td className="px-4 py-3">
-                            <button className="text-blue-400 hover:text-blue-300 mr-2">Run Now</button>
-                            <button className="text-blue-400 hover:text-blue-300">View Logs</button>
+                            <button className="text-blue-600 hover:text-blue-800 mr-2">Run Now</button>
+                            <button className="text-blue-600 hover:text-blue-800">View Logs</button>
                           </td>
                         </tr>
                         <tr>
                           <td className="px-4 py-3">Yield Calculation</td>
                           <td className="px-4 py-3">
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                               Completed
                             </span>
                           </td>
@@ -467,14 +467,14 @@ const ManagerPortal = () => {
                           <td className="px-4 py-3">in 2 hours</td>
                           <td className="px-4 py-3">3m 12s</td>
                           <td className="px-4 py-3">
-                            <button className="text-blue-400 hover:text-blue-300 mr-2">Run Now</button>
-                            <button className="text-blue-400 hover:text-blue-300">View Logs</button>
+                            <button className="text-blue-600 hover:text-blue-800 mr-2">Run Now</button>
+                            <button className="text-blue-600 hover:text-blue-800">View Logs</button>
                           </td>
                         </tr>
                         <tr>
                           <td className="px-4 py-3">Blockchain Sync</td>
                           <td className="px-4 py-3">
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
                               Delayed
                             </span>
                           </td>
@@ -482,8 +482,8 @@ const ManagerPortal = () => {
                           <td className="px-4 py-3">in progress</td>
                           <td className="px-4 py-3">10m 33s</td>
                           <td className="px-4 py-3">
-                            <button className="text-blue-400 hover:text-blue-300 mr-2">Restart</button>
-                            <button className="text-blue-400 hover:text-blue-300">View Logs</button>
+                            <button className="text-blue-600 hover:text-blue-800 mr-2">Restart</button>
+                            <button className="text-blue-600 hover:text-blue-800">View Logs</button>
                           </td>
                         </tr>
                       </tbody>
@@ -502,8 +502,8 @@ const ManagerPortal = () => {
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">Report Type</label>
-                      <select className="w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Report Type</label>
+                      <select className="w-full bg-white border border-gray-300 rounded-md py-2 px-3 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
                         <option>Quarterly Performance Report</option>
                         <option>Monthly NAV Summary</option>
                         <option>Investor Distribution Report</option>
@@ -513,8 +513,8 @@ const ManagerPortal = () => {
                     </div>
                     
                     <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">Fund</label>
-                      <select className="w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Fund</label>
+                      <select className="w-full bg-white border border-gray-300 rounded-md py-2 px-3 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
                         <option>All Funds</option>
                         <option>OnChain Growth Fund</option>
                         <option>Digital Asset Income Fund</option>
@@ -524,16 +524,16 @@ const ManagerPortal = () => {
                     </div>
                     
                     <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">Date Range</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Date Range</label>
                       <div className="flex space-x-2">
-                        <input type="date" className="w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                        <span className="flex items-center text-gray-400">to</span>
-                        <input type="date" className="w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                        <input type="date" className="w-full bg-white border border-gray-300 rounded-md py-2 px-3 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                        <span className="flex items-center text-gray-500">to</span>
+                        <input type="date" className="w-full bg-white border border-gray-300 rounded-md py-2 px-3 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500" />
                       </div>
                     </div>
                     
                     <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">Format</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Format</label>
                       <div className="flex space-x-4">
                         <label className="inline-flex items-center">
                           <input type="radio" className="form-radio text-blue-500" name="format" value="pdf" checked />
@@ -563,7 +563,7 @@ const ManagerPortal = () => {
                   
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
-                      <thead className="text-gray-400 border-b border-gray-700">
+                      <thead className="text-gray-600 border-b border-gray-200">
                         <tr>
                           <th className="px-4 py-2 text-left">Report Name</th>
                           <th className="px-4 py-2 text-left">Generated</th>
@@ -572,15 +572,15 @@ const ManagerPortal = () => {
                           <th className="px-4 py-2 text-left">Actions</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-700">
+                      <tbody className="divide-y divide-gray-200">
                         <tr>
                           <td className="px-4 py-3">Q1 2023 Performance Report</td>
                           <td className="px-4 py-3">Apr 5, 2023</td>
                           <td className="px-4 py-3">James Wilson</td>
                           <td className="px-4 py-3">PDF</td>
                           <td className="px-4 py-3">
-                            <button className="text-blue-400 hover:text-blue-300 mr-2">Download</button>
-                            <button className="text-blue-400 hover:text-blue-300">Share</button>
+                            <button className="text-blue-600 hover:text-blue-800 mr-2">Download</button>
+                            <button className="text-blue-600 hover:text-blue-800">Share</button>
                           </td>
                         </tr>
                         <tr>
@@ -589,8 +589,8 @@ const ManagerPortal = () => {
                           <td className="px-4 py-3">Olivia Martinez</td>
                           <td className="px-4 py-3">Excel</td>
                           <td className="px-4 py-3">
-                            <button className="text-blue-400 hover:text-blue-300 mr-2">Download</button>
-                            <button className="text-blue-400 hover:text-blue-300">Share</button>
+                            <button className="text-blue-600 hover:text-blue-800 mr-2">Download</button>
+                            <button className="text-blue-600 hover:text-blue-800">Share</button>
                           </td>
                         </tr>
                         <tr>
@@ -599,8 +599,8 @@ const ManagerPortal = () => {
                           <td className="px-4 py-3">Michael Johnson</td>
                           <td className="px-4 py-3">PDF</td>
                           <td className="px-4 py-3">
-                            <button className="text-blue-400 hover:text-blue-300 mr-2">Download</button>
-                            <button className="text-blue-400 hover:text-blue-300">Share</button>
+                            <button className="text-blue-600 hover:text-blue-800 mr-2">Download</button>
+                            <button className="text-blue-600 hover:text-blue-800">Share</button>
                           </td>
                         </tr>
                       </tbody>

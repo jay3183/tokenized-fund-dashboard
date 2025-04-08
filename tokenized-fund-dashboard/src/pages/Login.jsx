@@ -66,29 +66,29 @@ export default function Login() {
   ];
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary via-primary-dark to-secondary dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
+    <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center bg-gradient-to-br from-primary via-primary-dark to-secondary py-8">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="relative bg-white dark:bg-slate-800 shadow-xl rounded-2xl p-8 w-full max-w-md overflow-hidden"
+        className="relative bg-white shadow-xl rounded-2xl p-8 w-full max-w-md overflow-hidden"
       >
         {/* Background pattern */}
-        <div className="absolute -top-24 -right-24 w-64 h-64 bg-primary/10 dark:bg-blue-500/10 rounded-full"></div>
-        <div className="absolute -bottom-16 -left-16 w-48 h-48 bg-secondary/10 dark:bg-amber-500/10 rounded-full"></div>
+        <div className="absolute -top-24 -right-24 w-64 h-64 bg-primary/10 rounded-full"></div>
+        <div className="absolute -bottom-16 -left-16 w-48 h-48 bg-secondary/10 rounded-full"></div>
         
         {/* Success animation overlay */}
         {success && (
           <motion.div 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="absolute inset-0 bg-white dark:bg-slate-800 flex items-center justify-center z-10"
+            className="absolute inset-0 bg-white flex items-center justify-center z-10"
           >
             <motion.div
               initial={{ scale: 0.5, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ type: "spring", stiffness: 200, damping: 10 }}
-              className="bg-primary/10 dark:bg-primary/20 rounded-full p-4"
+              className="bg-primary/10 rounded-full p-4"
             >
               <motion.svg
                 initial={{ pathLength: 0, opacity: 0 }}
@@ -111,7 +111,7 @@ export default function Login() {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.5 }}
-              className="absolute mt-24 text-slate-700 dark:text-slate-200 font-medium"
+              className="absolute mt-24 text-slate-700 font-medium"
             >
               Login successful! Redirecting...
             </motion.p>
@@ -134,10 +134,10 @@ export default function Login() {
               </svg>
             </motion.div>
             
-            <h2 className="text-2xl font-bold mb-1 text-slate-800 dark:text-white">
+            <h2 className="text-2xl font-bold mb-1 text-slate-800">
               Franklin Templeton
             </h2>
-            <p className="text-slate-500 dark:text-slate-400 text-sm">
+            <p className="text-slate-500 text-sm">
               Tokenized Fund Dashboard
             </p>
           </div>
@@ -150,12 +150,12 @@ export default function Login() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder=" "
-                className="block w-full px-4 py-3 text-slate-900 dark:text-white bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent peer"
+                className="block w-full px-4 py-3 text-slate-900 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent peer"
                 required
               />
               <label 
                 htmlFor="email" 
-                className="absolute text-sm text-slate-500 dark:text-slate-400 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-white dark:bg-slate-700 px-2 peer-focus:px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-3 peer-focus:text-primary"
+                className="absolute text-sm text-slate-500 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-white px-2 peer-focus:px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-3 peer-focus:text-primary"
               >
                 Email
               </label>
@@ -168,12 +168,12 @@ export default function Login() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder=" "
-                className="block w-full px-4 py-3 text-slate-900 dark:text-white bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent peer"
+                className="block w-full px-4 py-3 text-slate-900 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent peer"
                 required
               />
               <label 
                 htmlFor="password" 
-                className="absolute text-sm text-slate-500 dark:text-slate-400 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-white dark:bg-slate-700 px-2 peer-focus:px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-3 peer-focus:text-primary"
+                className="absolute text-sm text-slate-500 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-white px-2 peer-focus:px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-3 peer-focus:text-primary"
               >
                 Password
               </label>
@@ -202,14 +202,14 @@ export default function Login() {
             <motion.div 
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800 text-red-600 dark:text-red-400 text-sm rounded-lg"
+              className="mt-4 p-3 bg-red-50 border border-red-100 text-red-600 text-sm rounded-lg"
             >
               {error}
             </motion.div>
           )}
 
-          <div className="mt-8 pt-6 border-t border-slate-200 dark:border-slate-700">
-            <h3 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">Demo Accounts</h3>
+          <div className="mt-8 pt-6 border-t border-slate-200">
+            <h3 className="text-sm font-medium text-slate-700 mb-3">Demo Accounts</h3>
             <div className="space-y-2">
               {demoAccounts.map(account => (
                 <motion.button
@@ -218,19 +218,19 @@ export default function Login() {
                     setEmail(account.email);
                     setPassword('password');
                   }}
-                  className="flex justify-between items-center w-full px-4 py-2 text-sm bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-lg transition-colors"
+                  className="flex justify-between items-center w-full px-4 py-2 text-sm bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
                   whileHover={{ scale: 1.01 }}
                   whileTap={{ scale: 0.99 }}
                   disabled={loading || success}
                 >
-                  <span className="font-medium text-slate-700 dark:text-slate-300">{account.label}</span>
-                  <code className="text-xs bg-white dark:bg-slate-800 px-2 py-1 rounded font-mono text-slate-600 dark:text-slate-400">
+                  <span className="font-medium text-slate-700">{account.label}</span>
+                  <code className="text-xs bg-white px-2 py-1 rounded font-mono text-slate-600">
                     {account.email}
                   </code>
                 </motion.button>
               ))}
-              <p className="text-xs text-slate-500 dark:text-slate-400 text-center mt-2">
-                Password: <code className="bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded">password</code>
+              <p className="text-xs text-slate-500 text-center mt-2">
+                Password: <code className="bg-slate-100 px-2 py-0.5 rounded">password</code>
               </p>
             </div>
           </div>

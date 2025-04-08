@@ -1,7 +1,7 @@
 import React from 'react';
 
 export const Card = ({ children, className = '' }) => (
-  <div className={`bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 ${className}`}>
+  <div className={`bg-white rounded-lg shadow-md p-6 ${className}`}>
     {children}
   </div>
 );
@@ -16,9 +16,9 @@ export const Button = ({ children, variant = 'primary', className = '', ...props
   const baseStyles = 'px-4 py-2 rounded-md font-medium transition-colors';
   const variants = {
     primary: 'bg-primary hover:bg-primary-700 text-white',
-    secondary: 'bg-gray-200 hover:bg-gray-300 text-gray-800 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-200',
+    secondary: 'bg-gray-200 hover:bg-gray-300 text-gray-800',
     danger: 'bg-red-600 hover:bg-red-700 text-white',
-    outline: 'bg-transparent border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200',
+    outline: 'bg-transparent border border-gray-300 hover:bg-gray-100 text-gray-800',
     accent: 'bg-accent hover:bg-accent-700 text-white',
   };
 
@@ -35,7 +35,7 @@ export const Button = ({ children, variant = 'primary', className = '', ...props
 export const Skeleton = ({ className = "", width }) => {
   return (
     <div 
-      className={`animate-pulse bg-gray-200 dark:bg-gray-700 rounded ${className}`}
+      className={`animate-pulse bg-gray-200 rounded ${className}`}
       style={width ? { width } : {}}
     />
   );

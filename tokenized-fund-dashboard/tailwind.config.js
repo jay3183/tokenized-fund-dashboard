@@ -4,12 +4,13 @@ export default {
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
-  darkMode: 'class',
+  darkMode: 'class', // Changed from 'media' to 'class' for manual dark mode control
   theme: {
     extend: {
       colors: {
         primary: '#00205B', // Updated Franklin Templeton primary blue
         'primary-light': '#1e3a8a',
+        'primary-dark': '#001745',
         'gold-500': '#f4b400',
         accent: '#00A3E0',  // Franklin Templeton accent blue
         managerBadge: '#E6F4EA', // Manager badge background

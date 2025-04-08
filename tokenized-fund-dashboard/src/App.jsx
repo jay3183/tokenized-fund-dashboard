@@ -1,8 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import {
-  ApolloClient,
-  InMemoryCache,
-  ApolloProvider,
   gql,
   useQuery,
   useMutation,
@@ -26,7 +23,7 @@ import { formatNumber, formatCurrency } from './utils/formatNumber';
 import CountUp from 'react-countup';
 import { format, parseISO } from 'date-fns';
 import { timeAgo } from './utils/timeAgo';
-import { useAuth } from './contexts/AuthContext';
+import { useAuth, AuthProvider } from './contexts/AuthContext';
 import { PortfolioProvider } from './contexts/PortfolioContext';
 import './App.css';
 import FundCard from './components/FundCard';
@@ -48,26 +45,39 @@ import PrivateRoute from './components/PrivateRoute';
 import AdminLayout from './layouts/AdminLayout';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import InvestorLayout from './layouts/InvestorLayout';
+import AdminFundList from './components/AdminFundList';
+import AdminUserManagement from './components/AdminUserManagement';
+import AdminAuditLog from './components/AdminAuditLog';
+import AdminNavControls from './components/AdminNavControls';
+import AdminYieldControls from './components/AdminYieldControls';
+import AdminSettings from './components/AdminSettings';
+import InvestorPortfolio from './pages/InvestorPortfolio';
+import InvestorTransactions from './pages/InvestorTransactions';
+import InvestorSettings from './pages/InvestorSettings';
+import { ThemeContext, ThemeProvider } from './ThemeContext.jsx';
+import ErrorBoundary from './components/ErrorBoundary';
 
-// Placeholder components for routing
-const PublicLayout = ({ children }) => (
-  <div className="flex flex-col min-h-screen">
-    <main className="flex-grow">
-      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {children || <Outlet />}
-      </div>
-    </main>
+// Responsive wrapper component
+const ResponsiveWrapper = ({ children }) => (
+  <div className="min-h-screen bg-white text-gray-900">
+    {children}
   </div>
 );
 
-const DashboardLayout = ({ children }) => (
-  <div className="flex flex-col min-h-screen">
-    <main className="flex-grow">
-      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {children || <Outlet />}
-      </div>
-    </main>
+// Public layout component that wraps home and login pages
+const PublicLayout = ({ children }) => (
+  <div className="flex flex-col min-h-screen bg-white text-gray-900">
+    {children || <Outlet />}
   </div>
+);
+
+// The provider layout wrapping authenticated pages to handle role-based redirects
+const ProviderLayout = ({ children }) => (
+  <AuthProvider>
+    <ResponsiveWrapper>
+      {children || <Outlet />}
+    </ResponsiveWrapper>
+  </AuthProvider>
 );
 
 // Define a helper function to get dashboard path based on role
@@ -173,11 +183,6 @@ function formatDollarAmount(amount) {
   
   return formatCurrency(amount);
 }
-
-const client = new ApolloClient({
-  uri: import.meta.env.VITE_GRAPHQL_API || 'http://localhost:4000/graphql',
-  cache: new InMemoryCache(),
-});
 
 const FUNDS_QUERY = gql`
   query GetAllFunds {
@@ -614,50 +619,16 @@ function AuditLog({ fundId }) {
 }
 
 export default function App() {
-  // Dark mode state
-  const [darkMode, setDarkMode] = useState(false);
-  const [adminView, setAdminView] = useState(false);
-  const [managerView, setManagerView] = useState(false);
-
-  const toggleDarkMode = () => setDarkMode(!darkMode);
-  const toggleAdminView = () => setAdminView(!adminView);
-  const toggleManagerView = () => setManagerView(!managerView);
-  
-  // Apply dark mode
-  useEffect(() => {
-    if (darkMode) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  }, [darkMode]);
-  
   return (
-    <PortfolioProvider>
-      <Toaster position="top-right" />
-      <div className="App">
-        <Header 
-          toggleDarkMode={toggleDarkMode} 
-          adminView={adminView}
-          toggleAdminView={toggleAdminView}
-          managerView={managerView}
-          toggleManagerView={toggleManagerView}
-        />
-        <div className="pt-20"> {/* Add padding to account for fixed header */}
+    <ErrorBoundary>
+      <ThemeProvider>
+        <div>
+          <Header />
           <Routes>
             {/* Public routes */}
             <Route path="/" element={
               <PublicLayout>
-                <Header 
-                  toggleDarkMode={toggleDarkMode} 
-                  adminView={adminView}
-                  toggleAdminView={toggleAdminView}
-                  managerView={managerView}
-                  toggleManagerView={toggleManagerView}
-                />
-                <div className="pt-20">
-                  <HomePage />
-                </div>
+                <HomePage />
               </PublicLayout>
             } />
             <Route path="/login" element={<PublicLayout><LoginPage /></PublicLayout>} />
@@ -672,9 +643,9 @@ export default function App() {
               </PrivateRoute>
             }>
               <Route index element={<InvestorDashboard />} />
-              <Route path="portfolio" element={<div>Portfolio</div>} />
-              <Route path="transactions" element={<div>Transactions</div>} />
-              <Route path="settings" element={<div>Settings</div>} />
+              <Route path="portfolio" element={<InvestorPortfolio />} />
+              <Route path="transactions" element={<InvestorTransactions />} />
+              <Route path="settings" element={<InvestorSettings />} />
             </Route>
 
             {/* Manager routes */}
@@ -691,19 +662,19 @@ export default function App() {
               </PrivateRoute>
             }>
               <Route index element={<AdminDashboard />} />
-              <Route path="funds" element={<div>Funds Management</div>} />
-              <Route path="users" element={<div>User Management</div>} />
-              <Route path="audit" element={<div>Audit Logs</div>} />
-              <Route path="nav" element={<div>NAV Controls</div>} />
-              <Route path="yield" element={<div>Yield Controls</div>} />
-              <Route path="settings" element={<div>Settings</div>} />
+              <Route path="funds" element={<AdminFundList />} />
+              <Route path="users" element={<AdminUserManagement />} />
+              <Route path="audit" element={<AdminAuditLog fundId="F1" />} />
+              <Route path="nav" element={<AdminNavControls />} />
+              <Route path="yield" element={<AdminYieldControls />} />
+              <Route path="settings" element={<AdminSettings />} />
             </Route>
 
             {/* Catch-all route */}
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </div>
-      </div>
-    </PortfolioProvider>
+      </ThemeProvider>
+    </ErrorBoundary>
   );
 }

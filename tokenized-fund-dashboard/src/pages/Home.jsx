@@ -19,17 +19,17 @@ export default function Home() {
   };
 
   return (
-    <div className="w-full bg-gradient-to-br from-[#00205B] via-slate-800 to-slate-900 text-white flex items-center justify-center px-4 py-20 min-h-[calc(100vh-5rem)]">
+    <div className="w-full bg-gradient-to-br from-[#00205B] via-primary-dark to-[#152238] text-white flex items-center justify-center px-4 min-h-[calc(100vh-4rem)] pt-0">
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
         className="max-w-3xl text-center"
       >
-        <h1 className="text-4xl sm:text-5xl font-bold mb-6 leading-tight">
+        <h1 className="text-4xl sm:text-5xl font-bold mb-6 leading-tight text-white">
           Welcome to the <span className="text-[#f5b800]">Franklin Templeton</span> Fund Dashboard
         </h1>
-        <p className="text-lg sm:text-xl text-white/80 mb-8">
+        <p className="text-lg sm:text-xl text-white mb-8">
           This dashboard allows investors, fund managers, and admins to track NAV, manage portfolios, and monitor intraday yield — all in real-time.
         </p>
         <motion.button

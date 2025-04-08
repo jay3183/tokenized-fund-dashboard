@@ -203,3 +203,44 @@ export const LOGIN = gql`
     }
   }
 `;
+
+// Query to get user transaction history
+export const GET_USER_TRANSACTIONS = gql`
+  query GetUserTransactions($userId: ID!) {
+    userTransactions(userId: $userId) {
+      id
+      type
+      date
+      amount
+      shares
+      navPrice
+      status
+      fundId
+      fundName
+    }
+  }
+`;
+
+// Admin dashboard query
+export const GET_ADMIN_DASHBOARD = gql`
+  query GetAdminDashboard {
+    dashboardMetrics {
+      totalAum
+      activeFunds
+      activeInvestors
+      averageYield
+    }
+    recentAdminActivity {
+      id
+      actor
+      action
+      timestamp
+      metadata
+    }
+    systemStatus {
+      dbConnected
+      chainlinkResponding
+      yieldUpdaterRunning
+    }
+  }
+`;
