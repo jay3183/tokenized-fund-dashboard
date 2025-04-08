@@ -82,6 +82,13 @@ cd tokenized-fund-dashboard
 npm install
 ```
 
+> ⚠️ **Note:** This project contains two separate folders with the same name:
+>
+> - The **root folder** (`tokenized-fund-dashboard/`) contains the **backend** (GraphQL server + Prisma).
+> - Inside it, the **`tokenized-fund-dashboard/` subfolder** contains the **frontend** (React + Vite).
+>
+> Be sure you’re in the correct folder for each step.
+
 3. Set up your environment:
 ```
  Frontend (React Dashboard)
@@ -119,7 +126,11 @@ This will reset your environment and fix any broken dependencies.
 
 6. Frontend:
 ```
+tokenized-fund-dashboard/         ← backend lives here
+└── tokenized-fund-dashboard/     ← frontend lives here (React + Vite)
+
 cd tokenized-fund-dashboard
+npm install
 npm run dev
 ```
 
