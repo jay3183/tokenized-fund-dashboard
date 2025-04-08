@@ -102,6 +102,8 @@ npx prisma db seed
 
 Backend:
 ```
+(GraphQL + Prisma)
+From the **project root**, start the backend server:
 npm run dev
 ```
 
