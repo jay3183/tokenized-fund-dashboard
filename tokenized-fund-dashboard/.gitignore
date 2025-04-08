@@ -7,14 +7,26 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Dependencies
 node_modules
+/.pnp
+.pnp.js
+
+# Build outputs
 dist
 dist-ssr
+build
 *.local
+
+# Testing
+coverage
+.nyc_output
+__snapshots__
 
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
+!.vscode/settings.json
 .idea
 .DS_Store
 *.suo
@@ -27,4 +39,27 @@ dist-ssr
 .env
 .env.local
 .env.development
+.env.test
 .env.production
+
+# Cache
+.npm
+.eslintcache
+.stylelintcache
+.parcel-cache
+
+# Misc
+.cache
+.temp
+.tmp
+temp
+tmp
+thumbs.db
+Thumbs.db
+
+# Debug
+debug
+.debug
+
+# Vitest state
+.vitest-state.json

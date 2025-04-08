@@ -8,10 +8,6 @@ A modern platform that brings tokenized investment funds into the digital age. R
 
 *Click the image above to watch the demo video*
 
-## 🖼️ Screenshots
-
-![Franklin Templeton Dashboard Home](https://raw.githubusercontent.com/jay3183/tokenized-fund-dashboard/master/screenshots/home-screen.png)
-*Welcome screen for the Franklin Templeton Fund Dashboard*
 
 ## What's this all about?
 

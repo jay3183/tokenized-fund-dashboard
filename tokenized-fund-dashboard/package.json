@@ -7,7 +7,11 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:ui": "vitest --ui"
   },
   "dependencies": {
     "@apollo/client": "^3.8.8",
@@ -38,6 +42,8 @@
   "devDependencies": {
     "@eslint/js": "^9.21.0",
     "@tailwindcss/postcss": "^4.1.2",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.3.0",
     "@types/react": "^19.0.10",
     "@types/react-dom": "^19.0.4",
     "@vitejs/plugin-react": "^4.3.4",
@@ -46,8 +52,10 @@
     "eslint-plugin-react-hooks": "^5.1.0",
     "eslint-plugin-react-refresh": "^0.4.19",
     "globals": "^15.15.0",
+    "jsdom": "^26.0.0",
     "postcss": "^8.5.3",
     "tailwindcss": "^3.4.17",
-    "vite": "^6.2.0"
+    "vite": "^6.2.0",
+    "vitest": "^3.1.1"
   }
 }
