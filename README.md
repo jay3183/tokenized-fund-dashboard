@@ -114,12 +114,10 @@ If everything is set up correctly, you should see:
  npm cache clean --force
  npm install
  npm run dev
-```
-
 This will reset your environment and fix any broken dependencies.
 ```
 
-Frontend:
+6. Frontend:
 ```
 cd tokenized-fund-dashboard
 npm run dev
