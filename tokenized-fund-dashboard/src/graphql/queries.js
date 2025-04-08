@@ -57,10 +57,18 @@ export const REDEEM_TOKENS = gql`
 
 // Mutation to withdraw yield
 export const WITHDRAW_YIELD = gql`
-  mutation WithdrawYield($input: WithdrawYieldInput!) {
-    withdrawYield(input: $input) {
+  mutation WithdrawYield($fundId: ID!) {
+    withdrawYield(fundId: $fundId) {
       amount
       timestamp
+      transactionId
+      portfolio {
+        id
+        investorId
+        fundId
+        shares
+        accruedYield
+      }
     }
   }
 `;

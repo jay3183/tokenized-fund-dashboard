@@ -26,10 +26,18 @@ const REDEEM_SHARES = gql`
 `;
 
 const WITHDRAW_YIELD = gql`
-  mutation WithdrawYield($input: WithdrawYieldInput!) {
-    withdrawYield(input: $input) {
+  mutation WithdrawYield($fundId: ID!) {
+    withdrawYield(fundId: $fundId) {
       amount
       timestamp
+      transactionId
+      portfolio {
+        id
+        investorId
+        fundId
+        shares
+        accruedYield
+      }
     }
   }
 `;
@@ -196,37 +204,34 @@ export function PortfolioProvider({ children }) {
   const withdrawYield = async (fundId, onSuccess) => {
     if (!user) {
       toast.error("Please log in to withdraw yield", getToastOptions(role));
-      return;
+      return { error: new Error("Not authenticated") };
     }
 
     try {
       setIsLoading(true);
       setError(null);
-      const investorId = user.id;
 
+      console.log("Executing withdraw yield mutation with fundId:", fundId);
+      
       const result = await apolloClient.mutate({
         mutation: WITHDRAW_YIELD,
         variables: {
-          input: {
-            fundId,
-            investorId
-          }
+          fundId
         }
       });
+      
+      console.log("Withdraw yield result:", result);
 
       setIsLoading(false);
       
       if (result.data?.withdrawYield) {
         const { amount } = result.data.withdrawYield;
-        toast.success(
-          `Successfully withdrawn $${amount.toFixed(2)} in yield.`,
-          getToastOptions(role)
-        );
         if (onSuccess) onSuccess(result.data.withdrawYield);
       }
       
       return result;
     } catch (error) {
+      console.error("Withdraw yield error:", error);
       handleError(error, "withdraw yield");
       return { error };
     }

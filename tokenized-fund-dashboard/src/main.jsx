@@ -7,6 +7,7 @@ import App from './App';
 import { AuthProvider } from './contexts/AuthContext';
 import client from './lib/apolloClient'; // Import the Apollo client setup
 import './index.css';
+import './auth-setup'; // Import auth setup for development
 
 // Log application startup
 console.log('[App] Starting application...');

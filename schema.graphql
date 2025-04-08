@@ -60,6 +60,7 @@ type Portfolio {
   investorId: ID!
   fundId: ID!
   shares: Float!
+  accruedYield: Float
   fund: Fund
 }
 
@@ -88,6 +89,8 @@ type RedeemResult {
 type YieldWithdrawalResult {
   amount: Float!
   timestamp: String!
+  transactionId: String!
+  portfolio: Portfolio
 }
 
 # Dashboard metrics for admin dashboard
@@ -140,7 +143,7 @@ type Mutation {
   updateNAV(input: UpdateNAVInput!): NAVSnapshot!
   mintShares(input: MintSharesInput!): MintResult!
   redeemShares(input: RedeemSharesInput!): RedeemResult!
-  withdrawYield(input: WithdrawYieldInput!): YieldWithdrawalResult!
+  withdrawYield(fundId: ID!): YieldWithdrawalResult!
 }
 
 input UpdateNAVInput {

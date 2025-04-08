@@ -97,9 +97,9 @@ export default function InvestorDashboard() {
         </div>
 
         {/* Portfolio panel */}
-        <div className="mb-6">
+        <div className="mb-6 flex justify-center">
           {isLoading ? (
-            <div className="bg-white dark:bg-slate-800 shadow-md rounded-xl p-8 animate-pulse">
+            <div className="bg-white dark:bg-slate-800 shadow-md rounded-xl p-8 animate-pulse w-full">
               <div className="h-8 bg-slate-200 dark:bg-slate-700 rounded w-1/4 mb-6"></div>
               <div className="grid grid-cols-2 gap-4 mb-4">
                 <div className="h-20 bg-slate-200 dark:bg-slate-700 rounded"></div>
@@ -114,7 +114,11 @@ export default function InvestorDashboard() {
               investorId={user?.id || ''} 
               onMintSuccess={(amount) => toast.success(`Minted ${amount} shares successfully!`)}
               onSellSuccess={(amount) => toast.success(`Sold ${amount} shares successfully!`)}
-              onWithdrawSuccess={(amount) => toast.success(`Withdrew $${amount.toFixed(2)} yield successfully!`)}
+              onWithdrawSuccess={(data) => {
+                // Ensure amount is a number before using toFixed
+                const amount = typeof data.amount === 'number' ? data.amount : parseFloat(data.amount || '0');
+                toast.success(`Withdrew $${amount.toFixed(2)} yield successfully!`);
+              }}
             />
           )}
         </div>
