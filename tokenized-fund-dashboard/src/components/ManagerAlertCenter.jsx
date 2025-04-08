@@ -231,239 +231,181 @@ const ManagerAlertCenter = () => {
         <h2 className="text-xl font-semibold">Alert Center</h2>
         
         <div className="flex flex-wrap gap-2 mt-2 sm:mt-0">
-          <div className="bg-gray-800 rounded-lg p-1">
+          <div className="bg-gray-100 rounded-lg p-1">
             <button
-              className={`px-3 py-1 rounded-md text-sm ${selectedPeriod === '24h' ? 'bg-blue-600 text-white' : 'text-gray-400'}`}
+              className={`px-3 py-1 rounded-md text-sm ${selectedPeriod === '24h' ? 'bg-blue-600 text-white' : 'text-gray-600'}`}
               onClick={() => setSelectedPeriod('24h')}
             >
               24h
             </button>
             <button
-              className={`px-3 py-1 rounded-md text-sm ${selectedPeriod === '7d' ? 'bg-blue-600 text-white' : 'text-gray-400'}`}
+              className={`px-3 py-1 rounded-md text-sm ${selectedPeriod === '7d' ? 'bg-blue-600 text-white' : 'text-gray-600'}`}
               onClick={() => setSelectedPeriod('7d')}
             >
               7d
             </button>
             <button
-              className={`px-3 py-1 rounded-md text-sm ${selectedPeriod === '30d' ? 'bg-blue-600 text-white' : 'text-gray-400'}`}
+              className={`px-3 py-1 rounded-md text-sm ${selectedPeriod === '30d' ? 'bg-blue-600 text-white' : 'text-gray-600'}`}
               onClick={() => setSelectedPeriod('30d')}
             >
               30d
             </button>
           </div>
           
-          <div className="bg-gray-800 rounded-lg p-1">
-            <button
-              className={`px-3 py-1 rounded-md text-sm ${alertFilter === 'all' ? 'bg-blue-600 text-white' : 'text-gray-400'}`}
-              onClick={() => setAlertFilter('all')}
-            >
-              All
-            </button>
-            <button
-              className={`px-3 py-1 rounded-md text-sm ${alertFilter === 'yield' ? 'bg-blue-600 text-white' : 'text-gray-400'}`}
-              onClick={() => setAlertFilter('yield')}
-            >
-              Yield
-            </button>
-            <button
-              className={`px-3 py-1 rounded-md text-sm ${alertFilter === 'nav' ? 'bg-blue-600 text-white' : 'text-gray-400'}`}
-              onClick={() => setAlertFilter('nav')}
-            >
-              NAV
-            </button>
-            <button
-              className={`px-3 py-1 rounded-md text-sm ${alertFilter === 'system' ? 'bg-blue-600 text-white' : 'text-gray-400'}`}
-              onClick={() => setAlertFilter('system')}
-            >
-              System
-            </button>
-          </div>
+          <select 
+            className="bg-white border border-gray-300 text-gray-600 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-1"
+            value={alertFilter}
+            onChange={(e) => setAlertFilter(e.target.value)}
+          >
+            <option value="all">All Types</option>
+            <option value="yield">Yield Alerts</option>
+            <option value="nav">NAV Alerts</option>
+            <option value="trading">Trading Alerts</option>
+            <option value="system">System Alerts</option>
+            <option value="compliance">Compliance Alerts</option>
+          </select>
         </div>
       </div>
       
-      {/* Alert Summary Cards */}
+      {/* Alert Summary Boxes */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div className="bg-gray-800 rounded-lg p-4">
-          <div className="flex items-center space-x-2 mb-2">
-            <div className="p-1.5 rounded-full bg-red-500/20">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div className="bg-white shadow rounded-lg p-4 border-l-4 border-red-500">
+          <h3 className="text-gray-700 font-semibold">High Priority</h3>
+          <div className="flex items-center justify-between mt-2">
+            <span className="text-2xl font-bold">{filteredAlerts.filter(a => a.severity === 'high').length}</span>
+            <span className="text-red-500">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
               </svg>
-            </div>
-            <span className="font-medium">High Priority</span>
+            </span>
           </div>
-          <div className="text-3xl font-bold">
-            {filteredAlerts.filter(a => a.severity === 'high').length}
-          </div>
+          <p className="text-sm text-gray-600 mt-1">Requires immediate attention</p>
         </div>
         
-        <div className="bg-gray-800 rounded-lg p-4">
-          <div className="flex items-center space-x-2 mb-2">
-            <div className="p-1.5 rounded-full bg-yellow-500/20">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+        <div className="bg-white shadow rounded-lg p-4 border-l-4 border-yellow-500">
+          <h3 className="text-gray-700 font-semibold">Medium Priority</h3>
+          <div className="flex items-center justify-between mt-2">
+            <span className="text-2xl font-bold">{filteredAlerts.filter(a => a.severity === 'medium').length}</span>
+            <span className="text-yellow-500">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-            </div>
-            <span className="font-medium">Medium Priority</span>
+            </span>
           </div>
-          <div className="text-3xl font-bold">
-            {filteredAlerts.filter(a => a.severity === 'medium').length}
-          </div>
+          <p className="text-sm text-gray-600 mt-1">To be reviewed today</p>
         </div>
         
-        <div className="bg-gray-800 rounded-lg p-4">
-          <div className="flex items-center space-x-2 mb-2">
-            <div className="p-1.5 rounded-full bg-blue-500/20">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div className="bg-white shadow rounded-lg p-4 border-l-4 border-blue-500">
+          <h3 className="text-gray-700 font-semibold">Low Priority</h3>
+          <div className="flex items-center justify-between mt-2">
+            <span className="text-2xl font-bold">{filteredAlerts.filter(a => a.severity === 'low').length}</span>
+            <span className="text-blue-500">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-            </div>
-            <span className="font-medium">Low Priority</span>
+            </span>
           </div>
-          <div className="text-3xl font-bold">
-            {filteredAlerts.filter(a => a.severity === 'low').length}
-          </div>
+          <p className="text-sm text-gray-600 mt-1">For informational purposes</p>
         </div>
         
-        <div className="bg-gray-800 rounded-lg p-4">
-          <div className="flex items-center space-x-2 mb-2">
-            <div className="p-1.5 rounded-full bg-gray-500/20">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z" />
+        <div className="bg-white shadow rounded-lg p-4 border-l-4 border-gray-500">
+          <h3 className="text-gray-700 font-semibold">Total Alerts</h3>
+          <div className="flex items-center justify-between mt-2">
+            <span className="text-2xl font-bold">{filteredAlerts.length}</span>
+            <span className="text-gray-500">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
               </svg>
-            </div>
-            <span className="font-medium">Total Alerts</span>
+            </span>
           </div>
-          <div className="text-3xl font-bold">
-            {filteredAlerts.length}
-          </div>
+          <p className="text-sm text-gray-600 mt-1">In selected time period</p>
         </div>
       </div>
       
-      {/* Alerts List */}
-      <div className="bg-gray-800 rounded-lg overflow-hidden">
-        <div className="divide-y divide-gray-700">
-          {filteredAlerts.length === 0 ? (
-            <div className="p-6 text-center text-gray-400">
-              No alerts found matching your criteria
-            </div>
-          ) : (
-            filteredAlerts.map(alert => (
-              <div key={alert.id} className="text-sm">
-                <div 
-                  className="p-4 hover:bg-gray-700 cursor-pointer"
-                  onClick={() => setShowDetails(showDetails === alert.id ? null : alert.id)}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <div className={`p-1.5 rounded-full ${getSeverityColor(alert.severity)}`}>
-                        {getAlertTypeIcon(alert.type)}
-                      </div>
-                      <div>
-                        <div className="font-medium">{alert.message}</div>
-                        <div className="text-xs text-gray-400">
-                          {alert.fundName} • {timeAgo(alert.timestamp)}
-                        </div>
-                      </div>
-                    </div>
-                    <div>
-                      <span className={`px-3 py-1 rounded-full text-xs ${getSeverityColor(alert.severity)}`}>
-                        {alert.severity.toUpperCase()}
-                      </span>
-                    </div>
+      {/* Alert Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {filteredAlerts.length === 0 ? (
+          <div className="md:col-span-2 bg-white shadow rounded-lg p-6 text-center">
+            <p className="text-gray-600">No alerts found for the selected criteria</p>
+          </div>
+        ) : (
+          filteredAlerts.map(alert => (
+            <div 
+              key={alert.id} 
+              className={`bg-white shadow rounded-lg overflow-hidden border-l-4 ${
+                alert.severity === 'high' ? 'border-red-500' : 
+                alert.severity === 'medium' ? 'border-yellow-500' : 'border-blue-500'
+              }`}
+            >
+              <div className="p-4">
+                <div className="flex justify-between">
+                  <div className="flex items-center space-x-2">
+                    <span className={`rounded-full p-1 ${
+                      alert.severity === 'high' ? 'bg-red-100 text-red-700' : 
+                      alert.severity === 'medium' ? 'bg-yellow-100 text-yellow-700' : 
+                      'bg-blue-100 text-blue-700'
+                    }`}>
+                      {getAlertTypeIcon(alert.type)}
+                    </span>
+                    <h3 className="font-semibold">{alert.message}</h3>
                   </div>
+                  <span className="text-gray-500 text-sm">
+                    {timeAgo(alert.timestamp)}
+                  </span>
                 </div>
                 
-                {/* Alert Details Expansion */}
+                <div className="mt-2">
+                  <p className="text-gray-600 text-sm">
+                    <span className="font-medium">{alert.fundName}</span> 
+                    {alert.fundId !== 'ALL' ? ` (ID: ${alert.fundId})` : ''}
+                  </p>
+                </div>
+                
+                {/* Alert detail toggle button */}
+                <div className="mt-3 flex justify-end">
+                  <button
+                    className="text-blue-600 text-sm hover:text-blue-800"
+                    onClick={() => setShowDetails(showDetails === alert.id ? null : alert.id)}
+                  >
+                    {showDetails === alert.id ? 'Hide Details' : 'View Details'}
+                  </button>
+                </div>
+                
+                {/* Alert details */}
                 {showDetails === alert.id && (
-                  <div className="bg-gray-900 p-4 border-l-2 border-blue-500">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <h4 className="font-medium mb-2 text-gray-300">Alert Details</h4>
-                        <div className="space-y-2">
-                          {Object.entries(alert.details).map(([key, value]) => (
-                            <div key={key} className="flex justify-between">
-                              <span className="text-gray-400 capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}:</span>
-                              <span className="font-mono">
-                                {typeof value === 'number' && key.toLowerCase().includes('percent') 
-                                  ? formatPercentage(value)
-                                  : typeof value === 'number' && (key.toLowerCase().includes('amount') || key.toLowerCase().includes('volume'))
-                                    ? formatCurrency(value)
-                                    : value.toString()}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
+                  <div className="mt-4 pt-4 border-t border-gray-200">
+                    <h4 className="text-sm font-semibold text-gray-700 mb-2">Alert Details</h4>
+                    <div className="bg-gray-50 rounded-lg p-3">
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        {/* Map details based on alert type */}
+                        {Object.entries(alert.details).map(([key, value]) => (
+                          <div key={key} className="flex flex-col">
+                            <span className="text-gray-600 text-xs">{key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}</span>
+                            <span className="font-medium">{
+                              typeof value === 'number' && key.toLowerCase().includes('percent') 
+                                ? `${value.toFixed(2)}%` 
+                                : typeof value === 'number' && (key.toLowerCase().includes('amount') || key.toLowerCase().includes('value'))
+                                  ? formatCurrency(value)
+                                  : value
+                            }</span>
+                          </div>
+                        ))}
                       </div>
-                      
-                      <div>
-                        <h4 className="font-medium mb-2 text-gray-300">Recommended Actions</h4>
-                        <ul className="list-disc list-inside space-y-1 text-gray-300">
-                          {alert.type === 'yield' && (
-                            <>
-                              <li>Verify yield calculation inputs</li>
-                              <li>Check for market conditions that may explain the change</li>
-                              <li>Review underlying asset performance</li>
-                              <li>Consider notifying investors if variation persists</li>
-                            </>
-                          )}
-                          
-                          {alert.type === 'nav' && (
-                            <>
-                              <li>Validate price feeds from all sources</li>
-                              <li>Check for calculation errors in NAV computation</li>
-                              <li>Review recent transactions for impact</li>
-                              <li>Consider delaying publication until verified</li>
-                            </>
-                          )}
-                          
-                          {alert.type === 'trading' && (
-                            <>
-                              <li>Monitor for market manipulation patterns</li>
-                              <li>Review large transactions for compliance</li>
-                              <li>Check for correlated market movements</li>
-                              <li>Ensure sufficient liquidity for redemptions</li>
-                            </>
-                          )}
-                          
-                          {alert.type === 'system' && (
-                            <>
-                              <li>Check system logs for errors</li>
-                              <li>Verify data provider connectivity</li>
-                              <li>Restart affected services if necessary</li>
-                              <li>Contact DevOps team for assistance</li>
-                            </>
-                          )}
-                          
-                          {alert.type === 'compliance' && (
-                            <>
-                              <li>Review transaction against compliance rules</li>
-                              <li>Check investor KYC/AML status</li>
-                              <li>Document review decision for audit</li>
-                              <li>Escalate to compliance officer if needed</li>
-                            </>
-                          )}
-                        </ul>
-                        
-                        <div className="mt-4 flex space-x-2">
-                          <button className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-xs">
-                            Mark as Reviewed
-                          </button>
-                          <button className="bg-gray-700 hover:bg-gray-600 text-white px-3 py-1 rounded text-xs">
-                            Escalate
-                          </button>
-                          <button className="bg-gray-700 hover:bg-gray-600 text-white px-3 py-1 rounded text-xs">
-                            Dismiss
-                          </button>
-                        </div>
-                      </div>
+                    </div>
+                    <div className="mt-3">
+                      <button className="bg-blue-600 text-white text-sm px-3 py-1 rounded hover:bg-blue-700">
+                        Mark as Resolved
+                      </button>
+                      <button className="ml-2 bg-gray-200 text-gray-800 text-sm px-3 py-1 rounded hover:bg-gray-300">
+                        Assign
+                      </button>
                     </div>
                   </div>
                 )}
               </div>
-            ))
-          )}
-        </div>
+            </div>
+          ))
+        )}
       </div>
     </div>
   );

@@ -86,15 +86,15 @@ const ManagerInvestorHeatmap = () => {
         <h2 className="text-xl font-semibold">Investor Heatmap</h2>
         
         <div className="flex flex-wrap gap-2 mt-2 sm:mt-0">
-          <div className="bg-gray-800 rounded-lg p-1">
+          <div className="bg-gray-100 rounded-lg p-1">
             <button
-              className={`px-3 py-1 rounded-md text-sm ${heatmapType === 'investment' ? 'bg-blue-600 text-white' : 'text-gray-400'}`}
+              className={`px-3 py-1 rounded-md text-sm ${heatmapType === 'investment' ? 'bg-blue-600 text-white' : 'text-gray-600'}`}
               onClick={() => setHeatmapType('investment')}
             >
               By Investment
             </button>
             <button
-              className={`px-3 py-1 rounded-md text-sm ${heatmapType === 'activity' ? 'bg-green-600 text-white' : 'text-gray-400'}`}
+              className={`px-3 py-1 rounded-md text-sm ${heatmapType === 'activity' ? 'bg-green-600 text-white' : 'text-gray-600'}`}
               onClick={() => setHeatmapType('activity')}
             >
               By Activity
@@ -104,9 +104,9 @@ const ManagerInvestorHeatmap = () => {
       </div>
       
       {/* Global Heatmap */}
-      <div className="bg-gray-800 rounded-lg p-4 mb-4">
+      <div className="bg-white shadow rounded-lg p-4 mb-4">
         <h3 className="text-lg font-semibold mb-3">Global Distribution</h3>
-        <p className="text-sm text-gray-400 mb-4">
+        <p className="text-sm text-gray-600 mb-4">
           {heatmapType === 'investment' 
             ? 'Heatmap shows distribution of investment amounts by region. Click a region to see country breakdown.' 
             : 'Heatmap shows investor activity levels by region (trading frequency, engagement). Click a region to see country breakdown.'}
@@ -153,7 +153,7 @@ const ManagerInvestorHeatmap = () => {
             <div className="w-3 h-3 rounded-sm" style={{ 
               backgroundColor: heatmapType === 'investment' ? 'rgba(59, 130, 246, 0.2)' : 'rgba(16, 185, 129, 0.2)'
             }}></div>
-            <span className="text-xs text-gray-400">Low</span>
+            <span className="text-xs text-gray-600">Low</span>
           </div>
           <div className="w-24 h-2 mx-2 rounded-sm" style={{
             background: heatmapType === 'investment' 
@@ -164,19 +164,19 @@ const ManagerInvestorHeatmap = () => {
             <div className="w-3 h-3 rounded-sm" style={{ 
               backgroundColor: heatmapType === 'investment' ? 'rgba(59, 130, 246, 1)' : 'rgba(16, 185, 129, 1)'
             }}></div>
-            <span className="text-xs text-gray-400">High</span>
+            <span className="text-xs text-gray-600">High</span>
           </div>
         </div>
       </div>
       
       {/* Country Breakdown for selected region */}
       {selectedRegion && (
-        <div className="bg-gray-800 rounded-lg p-4">
+        <div className="bg-white shadow rounded-lg p-4">
           <h3 className="text-lg font-semibold mb-3">{selectedRegion} Breakdown</h3>
           
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="text-gray-400">
+              <thead className="text-gray-700">
                 <tr>
                   <th className="px-3 py-2 text-left">Country</th>
                   <th className="px-3 py-2 text-right">Investors</th>
@@ -187,7 +187,7 @@ const ManagerInvestorHeatmap = () => {
               </thead>
               <tbody>
                 {selectedCountryData.map(country => (
-                  <tr key={country.country} className="border-t border-gray-700">
+                  <tr key={country.country} className="border-t border-gray-200">
                     <td className="px-3 py-2 font-medium">{country.country}</td>
                     <td className="px-3 py-2 text-right">{country.investors.toLocaleString()}</td>
                     <td className="px-3 py-2 text-right">{formatCurrency(country.totalInvestment)}</td>
