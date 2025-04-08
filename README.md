@@ -2,6 +2,17 @@
 
 A modern platform that brings tokenized investment funds into the digital age. Real-time NAV tracking, yield calculations, and a seamless investment experience all in one place!
 
+## 📺 Demo Video
+
+[![Franklin Templeton Tokenized Fund Dashboard Demo](https://img.youtube.com/vi/WwcXMLcl3hM/0.jpg)](https://youtu.be/WwcXMLcl3hM)
+
+*Click the image above to watch the demo video*
+
+## 🖼️ Screenshots
+
+![Franklin Templeton Dashboard Home](https://raw.githubusercontent.com/jay3183/tokenized-fund-dashboard/master/screenshots/home-screen.png)
+*Welcome screen for the Franklin Templeton Fund Dashboard*
+
 ## What's this all about?
 
 This project combines the world of traditional finance with blockchain technology, providing a comprehensive dashboard for managing tokenized investment funds. It consists of:

@@ -1,3 +1,4 @@
+import React from 'react';
 import { createContext, useState, useContext, useEffect } from 'react';
 import jwtDecode from 'jwt-decode';
 
@@ -90,8 +91,17 @@ export function AuthProvider({ children }) {
 // For backward compatibility
 export const RoleContext = AuthContext;
 export const RoleProvider = AuthProvider;
-export const useAuth = () => useContext(AuthContext);
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+};
 export const useRole = () => {
   const auth = useContext(AuthContext);
+  if (!auth) {
+    throw new Error('useRole must be used within an AuthProvider');
+  }
   return { role: auth.role, setRole: auth.setRole };
 }; 
