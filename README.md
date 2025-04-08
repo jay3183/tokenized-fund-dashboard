@@ -106,6 +106,19 @@ Backend:
 From the **project root**, start the backend server:
 npm run dev
 This runs the GraphQL API on `http://localhost:4000/graphql` by default.
+If everything is set up correctly, you should see:
+🚀 Server ready at http://localhost:4000/graphql
+ **Troubleshooting:**  
+ If you run into a `Cannot find module './common'` error from `debug` or `nodemon`, try:
+
+ ```
+ rm -rf node_modules package-lock.json
+ npm cache clean --force
+ npm install
+ npm run dev
+```
+
+This will reset your environment and fix any broken dependencies.
 ```
 
 Frontend:
