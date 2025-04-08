@@ -2,6 +2,27 @@
 
 A modern platform that brings tokenized investment funds into the digital age. Real-time NAV tracking, yield calculations, and a seamless investment experience all in one place!
 
+## 📸 Screenshots
+
+**Investor Portal**  
+Live NAV tracking, portfolio overview, and seamless share transactions.
+
+![Investor Dashboard](./screenshots/investor-dashboard.png)
+
+---
+
+**Manager View**  
+High-level fund metrics, system status, and recent team activity.
+
+![Manager Dashboard](./screenshots/manager-dashboard.png)
+
+---
+
+**Admin Portal**  
+Full access to fund controls, audit logs, and platform health monitoring.
+
+![Admin Dashboard](./screenshots/admin-dashboard.png)
+
 ## 📺 Demo Video
 
 [![Franklin Templeton Tokenized Fund Dashboard Demo](https://img.youtube.com/vi/WwcXMLcl3hM/0.jpg)](https://youtu.be/WwcXMLcl3hM)
