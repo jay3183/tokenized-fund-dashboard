@@ -84,6 +84,8 @@ npm install
 
 3. Set up your environment:
 ```
+#### Frontend (React Dashboard)
+Navigate into the frontend directory and copy the example environment file:
 cd tokenized-fund-dashboard
 cp .env.example .env
 # Now edit .env with your database credentials and other settings
