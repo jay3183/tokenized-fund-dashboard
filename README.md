@@ -77,7 +77,7 @@ cd tokenized-fund-dashboard
 
 2. Install the dependencies:
 ```
-npm install
+
 cd tokenized-fund-dashboard
 npm install
 ```
