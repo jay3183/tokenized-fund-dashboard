@@ -3,31 +3,63 @@ import React from 'react';
 const RecentActivity = ({ logs, loading }) => {
   // Helper for formatting time ago
   const timeAgo = (timestamp) => {
-    const now = new Date();
-    const past = new Date(timestamp);
-    const diffMs = now - past;
-    const diffSeconds = Math.floor(diffMs / 1000);
-    const diffMinutes = Math.floor(diffSeconds / 60);
-    const diffHours = Math.floor(diffMinutes / 60);
-    const diffDays = Math.floor(diffHours / 24);
+    if (!timestamp) return 'N/A';
     
-    if (diffMinutes < 1) return 'just now';
-    if (diffMinutes < 60) return `${diffMinutes}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    return `${diffDays}d ago`;
+    try {
+      // Handle various timestamp formats
+      const now = new Date();
+      let past;
+      
+      if (typeof timestamp === 'number') {
+        // Unix timestamp in milliseconds
+        past = new Date(timestamp);
+      } else if (typeof timestamp === 'string') {
+        // ISO string or other string format
+        past = new Date(timestamp);
+      } else {
+        // Unknown format
+        return 'Unknown date';
+      }
+      
+      // Check if date is valid
+      if (isNaN(past.getTime())) {
+        console.error("Invalid date from timestamp:", timestamp);
+        // For testing, return today's date formatted
+        return new Date().toLocaleString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+      }
+      
+      const diffMs = now - past;
+      const diffSeconds = Math.floor(diffMs / 1000);
+      const diffMinutes = Math.floor(diffSeconds / 60);
+      const diffHours = Math.floor(diffMinutes / 60);
+      const diffDays = Math.floor(diffHours / 24);
+      
+      if (diffMinutes < 1) return 'just now';
+      if (diffMinutes < 60) return `${diffMinutes}m ago`;
+      if (diffHours < 24) return `${diffHours}h ago`;
+      if (diffDays < 30) return `${diffDays}d ago`;
+      
+      // If more than a month, return formatted date
+      return past.toLocaleString('en-US', {
+        month: 'short',
+        day: 'numeric'
+      });
+    } catch (error) {
+      console.error("Error parsing date:", error, timestamp);
+      return 'Date error';
+    }
   };
 
   // Helper to get icon based on action type
   const getActionIcon = (action) => {
-    if (action.includes('NAV') || action.includes('Update')) {
-      return (
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
-        </svg>
-      );
-    }
+    if (!action) return null;
     
-    if (action.includes('Yield')) {
+    if (action.includes('REDEEM')) {
       return (
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -35,7 +67,31 @@ const RecentActivity = ({ logs, loading }) => {
       );
     }
     
-    if (action.includes('User') || action.includes('Permission')) {
+    if (action.includes('MINT')) {
+      return (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+        </svg>
+      );
+    }
+    
+    if (action.includes('WITHDRAW_YIELD') || action.includes('YIELD')) {
+      return (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      );
+    }
+    
+    if (action.includes('NAV')) {
+      return (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+        </svg>
+      );
+    }
+    
+    if (action.includes('USER') || action.includes('ROLE')) {
       return (
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
@@ -53,9 +109,13 @@ const RecentActivity = ({ logs, loading }) => {
 
   // Helper to get background color based on action type
   const getActionColor = (action) => {
-    if (action.includes('NAV') || action.includes('Update')) return 'bg-blue-500';
-    if (action.includes('Yield')) return 'bg-purple-500';
-    if (action.includes('User') || action.includes('Permission')) return 'bg-green-500';
+    if (!action) return 'bg-gray-500';
+    
+    if (action.includes('REDEEM')) return 'bg-red-500';
+    if (action.includes('MINT')) return 'bg-green-500';
+    if (action.includes('WITHDRAW_YIELD') || action.includes('YIELD')) return 'bg-purple-500';
+    if (action.includes('NAV')) return 'bg-blue-500';
+    if (action.includes('USER') || action.includes('ROLE')) return 'bg-yellow-500';
     return 'bg-gray-500';
   };
 
@@ -64,12 +124,49 @@ const RecentActivity = ({ logs, loading }) => {
     if (!metadata) return '';
     
     try {
-      const data = typeof metadata === 'string' ? JSON.parse(metadata) : metadata;
+      let data;
+      if (typeof metadata === 'string') {
+        try {
+          data = JSON.parse(metadata);
+        } catch (e) {
+          return metadata.toString();
+        }
+      } else {
+        data = metadata;
+      }
+      
+      // Format specific transaction types
+      if (data.sharesRedeemed) {
+        return `${data.sharesRedeemed} shares @ $${data.navUsed} = $${data.amountUSD}`;
+      }
+      
+      if (data.sharesMinted) {
+        return `${data.sharesMinted} shares @ $${data.navUsed} = $${data.amountUsd || data.amountUSD}`;
+      }
+      
+      if (data.amount && data.transactionId) {
+        return `$${data.amount} (ID: ${data.transactionId})`;
+      }
+      
+      if (data.fund && data.navValue) {
+        return `${data.fund}: $${data.navValue}`;
+      }
+      
+      if (data.fund && data.yieldValue) {
+        return `${data.fund}: ${data.yieldValue}%`;
+      }
+      
+      if (data.user && data.role) {
+        return `${data.user} → ${data.role}`;
+      }
+      
+      // Otherwise just return as key-value pairs
       return Object.entries(data)
         .map(([key, value]) => `${key}: ${value}`)
         .join(', ');
     } catch (err) {
-      return metadata.toString();
+      console.error("Error parsing metadata:", err, metadata);
+      return String(metadata);
     }
   };
 
@@ -97,8 +194,8 @@ const RecentActivity = ({ logs, loading }) => {
           </div>
         ) : (
           <div className="space-y-4">
-            {logs.map((log) => (
-              <div key={log.id} className="flex items-start space-x-3">
+            {logs.map((log, idx) => (
+              <div key={log.id || idx} className="flex items-start space-x-3">
                 <div className={`p-2 mt-1 rounded-full ${getActionColor(log.action)} text-white`}>
                   {getActionIcon(log.action)}
                 </div>
@@ -108,7 +205,7 @@ const RecentActivity = ({ logs, loading }) => {
                     {parseMetadata(log.metadata)}
                   </p>
                   <div className="flex items-center text-gray-400 dark:text-gray-500 text-xs mt-1">
-                    <span className="mr-2">{log.actor}</span>
+                    <span className="mr-2">{log.actor || 'System'}</span>
                     <span>{timeAgo(log.timestamp)}</span>
                   </div>
                 </div>

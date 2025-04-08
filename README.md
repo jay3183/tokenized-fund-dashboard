@@ -1,119 +1,99 @@
-# GraphQL Intraday Yield Service
+# 💼 Tokenized Fund Dashboard
 
-A GraphQL API for tracking tokenized fund data, including NAV (Net Asset Value) and intraday yield information.
+A modern platform that brings tokenized investment funds into the digital age. Real-time NAV tracking, yield calculations, and a seamless investment experience all in one place!
 
-## Overview
+## What's this all about?
 
-This service provides real-time tracking of tokenized funds, including:
+This project combines the world of traditional finance with blockchain technology, providing a comprehensive dashboard for managing tokenized investment funds. It consists of:
 
-- Current and historical NAV data
-- Intraday yield information
-- User holdings and portfolios
-- Fund operations (mint/redeem shares)
-- Audit logging for all operations
+- A powerful GraphQL API backend that handles all the fund data
+- A slick React frontend that makes managing investments a breeze
 
-## Getting Started
+## ✨ Key Features
 
-### Prerequisites
+- **Role-based Access**: Different views for Investors, Fund Managers, and Admins - everyone sees exactly what they need
+- **Live Fund Monitoring**: Watch NAV changes and yield calculations update in real-time
+- **Seamless Transactions**: Mint new shares or redeem existing ones with just a few clicks
+- **Yield Management**: Track your earnings and withdraw yield when you're ready
+- **Data Visualization**: Beautiful charts and analytics to understand performance at a glance
+- **Full Audit Trail**: Complete history of all actions for transparency and compliance
 
-- Node.js 14+
+## 🏗️ How It's Built
+
+### Backend
+- GraphQL API with Apollo Server for efficient data fetching
+- Prisma ORM making database operations a breeze
+- Secure JWT authentication with role-based permissions
+- Smart resolvers that handle complex fund calculations
+
+### Frontend
+- React + Vite for a lightning-fast development experience
+- Apollo Client for seamless GraphQL integration
+- Chart.js creating beautiful visualizations of your data
+- Tailwind CSS for a responsive design that looks great on any device
+
+## 🚀 Getting Started
+
+### What You'll Need
+- Node.js (v16+)
 - npm or yarn
+- PostgreSQL database
 
-### Installation
+### Setup in 5 Easy Steps
 
-1. Clone the repository
-2. Install dependencies:
-   ```
-   npm install
-   ```
-3. Start the server:
-   ```
-   npm start
-   ```
-
-The GraphQL server will be available at http://localhost:4000 with the GraphQL Playground interface for testing queries.
-
-## GraphQL Schema
-
-The API provides the following main types:
-
-- `User`: Information about platform users
-- `Fund`: Tokenized fund data including NAV and yield information
-- `Holding`: User's holdings of fund shares
-- `NavHistory`: Historical NAV data points
-- `YieldHistory`: Historical yield data points
-- `Portfolio`: A user's collection of fund holdings
-- `AuditLog`: Record of all operations performed
-
-## Example Queries
-
-### Get Fund Information
-
-```graphql
-query GetFund {
-  fund(id: "F1") {
-    id
-    name
-    currentNav
-    intradayYield
-    totalAum
-  }
-}
+1. Clone the repo:
+```
+git clone https://github.com/yourusername/tokenized-fund-dashboard.git
+cd tokenized-fund-dashboard
 ```
 
-### Get User Portfolio
-
-```graphql
-query GetPortfolio {
-  portfolio(userId: "1") {
-    holdings {
-      fund {
-        name
-        currentNav
-      }
-      shares
-      valueUsd
-    }
-    totalValueUsd
-  }
-}
+2. Install the dependencies:
+```
+npm install
+cd tokenized-fund-dashboard
+npm install
 ```
 
-### Get NAV History
-
-```graphql
-query GetNavHistory {
-  navHistory(fundId: "F1", days: 7) {
-    timestamp
-    nav
-    source
-  }
-}
+3. Set up your environment:
+```
+cp .env.example .env
+# Now edit .env with your database credentials and other settings
 ```
 
-## Mutations
+4. Initialize your database:
+```
+npx prisma migrate dev
+npx prisma db seed
+```
 
-The API supports the following operations:
+5. Fire up the servers:
 
-- `updateNav`: Update a fund's NAV
-- `mintShares`: Mint new fund shares for a user
-- `redeemShares`: Redeem (burn) shares from a user
+Backend:
+```
+npm run dev
+```
 
-## Simulated Data
+Frontend:
+```
+cd tokenized-fund-dashboard
+npm run dev
+```
 
-The service includes a simulation engine that generates realistic market data, including:
+## 🚀 Deployment
 
-- Time-dependent NAV changes
-- Intraday yield fluctuations with market-like patterns
-- Updates every 15 seconds
+When you're ready to go live:
 
-## Project Structure
+Backend:
+```
+npm start
+```
 
-- `index.js`: Main server entry point and data simulation
-- `schema.graphql`: GraphQL schema definition
-- `resolvers.js`: GraphQL resolver functions
-- `mockData.js`: Sample data and simulation helpers
+Frontend:
+```
+cd tokenized-fund-dashboard
+npm run build
+```
 
-## License
+## 📝 License
 
-MIT
+MIT License - do awesome things with this code!

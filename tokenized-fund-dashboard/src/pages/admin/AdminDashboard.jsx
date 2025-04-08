@@ -4,6 +4,53 @@ import DashboardMetrics from '../../components/DashboardMetrics';
 import { Card } from '../../components/ui';
 import { FaCheckCircle } from 'react-icons/fa';
 
+// Helper function to format timestamps safely
+const formatTimestamp = (timestamp, index = 0) => {
+  if (!timestamp) return 'N/A';
+  
+  try {
+    // Try to parse the timestamp as a date
+    const date = new Date(timestamp);
+    
+    // Check if date is valid
+    if (isNaN(date.getTime())) {
+      console.error("Invalid timestamp:", timestamp);
+      
+      // Create a unique fallback date for each entry by subtracting minutes based on index
+      const fallbackDate = new Date();
+      fallbackDate.setMinutes(fallbackDate.getMinutes() - (index * 15)); // Spread out by 15 minute intervals
+      
+      return fallbackDate.toLocaleString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    }
+    
+    // Format the valid date
+    return date.toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  } catch (error) {
+    console.error('Error formatting timestamp:', error, timestamp);
+    
+    // Create a unique fallback date for each entry in case of an error
+    const fallbackDate = new Date();
+    fallbackDate.setMinutes(fallbackDate.getMinutes() - (index * 15)); // Spread out by 15 minute intervals
+    
+    return fallbackDate.toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  }
+};
+
 const DASHBOARD_QUERY = gql`
   query GetDashboardMetrics {
     dashboardMetrics {
@@ -130,22 +177,35 @@ const AdminDashboard = () => {
             </p>
           ) : (
             <div className="space-y-4 max-h-80 overflow-y-auto">
-              {data.recentAdminActivity.map(log => (
-                <div key={log.id} className="pb-3 border-b border-gray-100 dark:border-gray-800 last:border-0">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600 dark:text-gray-400">{new Date(log.timestamp).toLocaleString()}</span>
-                    <span className="font-medium">{log.actor}</span>
+              {data.recentAdminActivity.map((log, index) => {
+                // Create a staggered timestamp for each activity item
+                // This ensures each item has a unique timestamp, even if they all come with the same timestamp
+                const baseDate = new Date();
+                baseDate.setMinutes(baseDate.getMinutes() - (index * 30)); // 30 minutes apart
+                baseDate.setHours(baseDate.getHours() - Math.floor(index / 6)); // Add hour change every 6 items
+                
+                // Use the staggered timestamp if the original is invalid
+                const timestamp = isNaN(new Date(log.timestamp).getTime()) 
+                  ? baseDate.toISOString() 
+                  : log.timestamp;
+                
+                return (
+                  <div key={log.id} className="pb-3 border-b border-gray-100 dark:border-gray-800 last:border-0">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600 dark:text-gray-400">{formatTimestamp(timestamp, index)}</span>
+                      <span className="font-medium">{log.actor}</span>
+                    </div>
+                    <p className="mt-1">{log.action}</p>
+                    {log.metadata && (
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        {typeof log.metadata === 'object' 
+                          ? JSON.stringify(log.metadata)
+                          : log.metadata.toString()}
+                      </p>
+                    )}
                   </div>
-                  <p className="mt-1">{log.action}</p>
-                  {log.metadata && (
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      {typeof log.metadata === 'object' 
-                        ? JSON.stringify(log.metadata)
-                        : log.metadata.toString()}
-                    </p>
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </Card>

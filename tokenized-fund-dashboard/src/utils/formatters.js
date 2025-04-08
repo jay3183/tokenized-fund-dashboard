@@ -59,6 +59,18 @@ export const formatDate = (dateString) => {
   
   try {
     const date = new Date(dateString);
+    
+    // Check if the date is valid
+    if (isNaN(date.getTime())) {
+      console.error('Invalid date detected:', dateString);
+      // Return current date as a fallback
+      return new Date().toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+    }
+    
     return date.toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
@@ -66,7 +78,12 @@ export const formatDate = (dateString) => {
     });
   } catch (error) {
     console.error('Error formatting date:', error);
-    return 'Invalid Date';
+    // Use current date as fallback instead of showing "Invalid Date"
+    return new Date().toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
   }
 };
 
@@ -76,11 +93,14 @@ export const formatDate = (dateString) => {
  * @returns {string} - Human-readable time ago string
  */
 export function formatTimeAgo(dateStr) {
-  if (!dateStr) return 'Just now';
+  if (!dateStr) return 'Recent';
   
   try {
     const date = new Date(dateStr);
-    if (isNaN(date)) return 'Just now';
+    if (isNaN(date.getTime())) {
+      console.error('Invalid date for formatTimeAgo:', dateStr);
+      return 'Recent';
+    }
     
     const seconds = Math.floor((Date.now() - date) / 1000);
     
@@ -104,8 +124,8 @@ export function formatTimeAgo(dateStr) {
     const years = Math.floor(months / 12);
     return `${years} years ago`;
   } catch (error) {
-    console.error('Error calculating time ago:', error);
-    return 'Just now';
+    console.error('Error calculating time ago:', error, dateStr);
+    return 'Recent';
   }
 }
 

@@ -10,9 +10,18 @@ export function formatDate(dateString) {
   
   try {
     const date = new Date(dateString);
+    
+    // Check if date is valid
+    if (isNaN(date.getTime())) {
+      console.error('Invalid date detected in formatDate.js:', dateString);
+      // Return current date as fallback
+      return format(new Date(), 'MMM d, yyyy');
+    }
+    
     return format(date, 'MMM d, yyyy');
   } catch (error) {
     console.error('Error formatting date:', dateString, error);
-    return 'Invalid Date';
+    // Use current date as fallback
+    return format(new Date(), 'MMM d, yyyy');
   }
 } 

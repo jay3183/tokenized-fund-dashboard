@@ -55,9 +55,28 @@ const server = new ApolloServer({
     return { user, prisma };
   },
   plugins: [ApolloServerPluginDrainHttpServer({ httpServer })],
+  formatError: (error) => {
+    console.error('[GraphQL] Error in operation:', error);
+    
+    // Return sanitized error without internal details
+    return {
+      message: error.message,
+      path: error.path,
+      extensions: {
+        code: error.extensions?.code || 'INTERNAL_SERVER_ERROR',
+        // Don't include stack trace in production
+        ...(process.env.NODE_ENV === 'development' ? { stacktrace: error.extensions?.stacktrace } : {})
+      }
+    };
+  },
+  introspection: true, // Enable introspection for tools like Apollo Explorer
+  csrfPrevention: false, // Disable CSRF for dev environment
 });
 
 await server.start();
+
+// Set a longer timeout for the HTTP server to handle longer operations
+httpServer.timeout = 60000; // 60 seconds
 
 // GraphQL endpoint with enhanced CORS and debugging
 app.use(

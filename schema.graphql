@@ -73,6 +73,22 @@ type AuditLog {
   metadata: JSON
 }
 
+# Transaction type for user transaction history
+type Transaction {
+  id: ID!
+  type: String!  # MINT, REDEEM, YIELD_PAYMENT
+  date: String!
+  timestamp: String!  # Same as date but kept for backward compatibility
+  amount: Float!
+  shares: Float
+  navPrice: Float
+  navAtTransaction: Float # NAV price at the time of transaction
+  status: String!
+  fundId: ID!
+  fundName: String
+  metadata: JSON
+}
+
 type MintResult {
   sharesMinted: Float!
   navUsed: Float!
@@ -125,12 +141,18 @@ type Query {
   yieldSnapshots(fundId: ID!): [YieldSnapshot!]!
   portfolio(investorId: ID!, fundId: ID!): Portfolio
   auditLogs(fundId: ID!): [AuditLog!]!
+  # Get all audit logs across all funds
+  allLogs: [AuditLog!]!
+  # Get transaction history for a user
+  userTransactions(userId: ID!): [Transaction!]
+  # Get transactions for a specific fund and investor
+  transactions(investorId: ID!, fundId: ID!): [Transaction!]!
   # Current user query
   me: User
   # Dashboard metrics for admin
   dashboardMetrics: DashboardMetrics!
   # Recent activity logs for admin
-  recentAdminActivity: [AuditLog!]!
+  recentAdminActivity(limit: Int): [AuditLog!]!
   # System status information
   systemStatus: SystemStatus!
 }
